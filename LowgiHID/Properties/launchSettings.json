@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "LowgiHID": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}
