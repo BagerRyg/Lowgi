@@ -19,7 +19,7 @@ FILE_TYPES = [
     '*.toml'
 ]
 
-TARGET_PROJ = 'LGSTrayUI'
+TARGET_PROJ = 'LowgiUI'
 PROJ_FILE = f'./{TARGET_PROJ}/{TARGET_PROJ}.csproj'
 TARGET_VER = ET.parse(PROJ_FILE).getroot() \
                 .findall('./PropertyGroup/VersionPrefix')[0].text
@@ -47,7 +47,7 @@ class PublishHelper:
     def publish_profile(self, profile, zip_suffix):
         safe_ver = TARGET_VER.replace('.', '_')
 
-        for proj in ["LGSTrayHID", "LGSTrayUI"]:
+        for proj in ["LowgiHID", "LowgiUI"]:
             subprocess.run(
                 ["dotnet", "publish", f"{proj}/{proj}.csproj", f"/p:PublishProfile={profile}", f"/p:Version={TARGET_VER}"],
                 shell=False

@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "LowgiUI": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    },
+    "LowgiUI - Debug Native": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

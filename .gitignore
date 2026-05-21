@@ -1,4 +1,5 @@
 HIDPP_Bat_Mon/**
+Build */
 
 # Native HID CPP daemon libs
 LGSTrayNative_cpp/**
