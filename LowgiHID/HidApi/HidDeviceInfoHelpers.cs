@@ -35,6 +35,9 @@ namespace LowgiHID.HidApi
                     {
                         0x0001 => HidppMessageType.SHORT,
                         0x0002 => HidppMessageType.LONG,
+                        0x0004 => HidppMessageType.LONG,
+                        0x0301 => HidppMessageType.SHORT,
+                        0x0302 => HidppMessageType.LONG,
                         _ => HidppMessageType.NONE,
                     };
                 }

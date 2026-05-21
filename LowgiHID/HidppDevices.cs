@@ -1,4 +1,5 @@
 using LowgiHID.HidApi;
+using LowgiPrimitives;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -75,7 +76,8 @@ namespace LowgiHID
         { 
             if (_devShort != IntPtr.Zero)
             {
-                throw new ReadOnlyException();
+                HidClose(devShort);
+                return;
             }
             _devShort = devShort;
             await SetUp();
@@ -85,7 +87,8 @@ namespace LowgiHID
         {
             if (_devLong != IntPtr.Zero)
             {
-                throw new ReadOnlyException();
+                HidClose(devLong);
+                return;
             }
             _devLong = devLong;
             await SetUp();
@@ -108,7 +111,7 @@ namespace LowgiHID
                     continue;
                 }
 
-                await ProcessMessgage(buffer);
+                await ProcessMessgage(buffer.ToArray());
             }
 
             HidClose(dev);
@@ -119,7 +122,7 @@ namespace LowgiHID
             if ((buffer[2] == 0x41) && ((buffer[4] & 0x40) == 0))
             {
                 byte deviceIdx = buffer[1];
-                if (true || !_deviceCollection.ContainsKey(deviceIdx))
+                if (!_deviceCollection.ContainsKey(deviceIdx))
                 {
                     _deviceCollection[deviceIdx] = new(this, deviceIdx);
                     new Thread(async () =>
@@ -129,7 +132,10 @@ namespace LowgiHID
                             await Task.Delay(1000);
                             await _deviceCollection[deviceIdx].InitAsync();
                         }
-                        catch (Exception) { }
+                        catch (Exception ex)
+                        {
+                            CrashLog.Write(ex, "HID device init thread");
+                        }
                     }).Start();
                 }
             }
@@ -162,6 +168,10 @@ namespace LowgiHID
                     try
                     {
                         ret = await _channel.Reader.ReadAsync(cts.Token);
+                        if (ret.Length < 3)
+                        {
+                            continue;
+                        }
 
                         if ((ret[2] == 0x8F) || (ret[2] == buffer[2]))
                         {
@@ -202,11 +212,23 @@ namespace LowgiHID
                     try
                     {
                         ret = await _channel.Reader.ReadAsync(cts.Token);
+                        if (ret.Length < 4)
+                        {
+                            continue;
+                        }
 
                         if (!ignoreHID10 && (ret.GetFeatureIndex() == 0x8F))
                         {
                             // HID++ 1.0 response or timeout
                             break;
+                        }
+
+                        if (ret.GetFeatureIndex() == 0xFF
+                            && ret.GetFunctionId() == 0x0F
+                            && ret.GetParam(0) == buffer.GetFeatureIndex()
+                            && ret.GetParam(1) == (buffer[3] & 0xF0))
+                        {
+                            return ret;
                         }
 
                         if ((ret.GetFeatureIndex() == buffer.GetFeatureIndex()) && (ret.GetSoftwareId() == SW_ID))
@@ -294,13 +316,33 @@ namespace LowgiHID
             Console.WriteLine("Device ready");
 #endif
 
-            Thread t1 = new(async () => { await ReadThread(_devShort, 7); })
+            Thread t1 = new(async () =>
+            {
+                try
+                {
+                    await ReadThread(_devShort, 7);
+                }
+                catch (Exception ex)
+                {
+                    CrashLog.Write(ex, "HID short read thread");
+                }
+            })
             {
                 Priority = ThreadPriority.BelowNormal
             };
             t1.Start();
 
-            Thread t2 = new(async () => { await ReadThread(_devLong, 20); })
+            Thread t2 = new(async () =>
+            {
+                try
+                {
+                    await ReadThread(_devLong, 20);
+                }
+                catch (Exception ex)
+                {
+                    CrashLog.Write(ex, "HID long read thread");
+                }
+            })
             {
                 Priority = ThreadPriority.BelowNormal
             };
@@ -311,7 +353,7 @@ namespace LowgiHID
             // Read number of devices on reciever
             ret = await WriteRead10(_devShort, [0x10, 0xFF, 0x81, 0x02, 0x00, 0x00, 0x00], 1000);
             byte numDeviceFound = 0;
-            if ((ret[2] == 0x81) && (ret[3] == 0x02))
+            if (ret.Length > 5 && (ret[2] == 0x81) && (ret[3] == 0x02))
             {
                 numDeviceFound = ret[5];
             }
@@ -326,6 +368,12 @@ namespace LowgiHID
 
             if (_deviceCollection.Count == 0)
             {
+                var directPing = await Ping20(0xFF, 100, false);
+                if (directPing)
+                {
+                    _deviceCollection[0xFF] = new(this, 0xFF);
+                }
+
                 // Fail to enumerate devices
                 for (byte i = 1; i <= 6; i++)
                 {

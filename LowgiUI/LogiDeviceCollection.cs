@@ -83,7 +83,16 @@ namespace LowgiUI
             LogiDeviceViewModel? dev = Devices.SingleOrDefault(x => x.DeviceId == initMessage.deviceId);
             if (dev != null)
             {
-                Application.Current.Dispatcher.BeginInvoke(() => dev.UpdateState(initMessage));
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                {
+                    try
+                    {
+                        dev.UpdateState(initMessage);
+                    }
+                    catch
+                    {
+                    }
+                });
 
                 return;
             }
@@ -92,8 +101,14 @@ namespace LowgiUI
 
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                Devices.Add(dev);
-                AutoSelectOnlyDevice();
+                try
+                {
+                    Devices.Add(dev);
+                    AutoSelectOnlyDevice();
+                }
+                catch
+                {
+                }
             });
         }
 
@@ -101,12 +116,18 @@ namespace LowgiUI
         {
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                var device = Devices.FirstOrDefault(dev => dev.DeviceId == updateMessage.deviceId);
-                if (device == null) { return; }
+                try
+                {
+                    var device = Devices.FirstOrDefault(dev => dev.DeviceId == updateMessage.deviceId);
+                    if (device == null) { return; }
 
-                device.UpdateState(updateMessage);
-                _userSettings.SetCachedBatteryPercentage(device.DeviceId, device.BatteryPercentage);
-                _lowBatteryNotificationService.CheckDevice(device);
+                    device.UpdateState(updateMessage);
+                    _userSettings.SetCachedBatteryPercentage(device.DeviceId, device.BatteryPercentage);
+                    _lowBatteryNotificationService.CheckDevice(device);
+                }
+                catch
+                {
+                }
             });
         }
 

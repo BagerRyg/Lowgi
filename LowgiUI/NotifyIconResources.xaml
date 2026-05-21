@@ -365,6 +365,12 @@
             <MenuItem Header="15%" MinWidth="120" IsCheckable="True" IsChecked="{Binding LowBatteryWarningThreshold15}" StaysOpenOnClick="True" />
             <MenuItem Header="20%" MinWidth="120" IsCheckable="True" IsChecked="{Binding LowBatteryWarningThreshold20}" StaysOpenOnClick="True" />
         </MenuItem>
+        <MenuItem Header="Mouse LED">
+            <MenuItem Header="White" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeWhite}" StaysOpenOnClick="True" />
+            <MenuItem Header="Grey" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeGrey}" StaysOpenOnClick="True" />
+            <MenuItem Header="Low Battery" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeLowBattery}" StaysOpenOnClick="True" />
+            <MenuItem Header="Off" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeOff}" StaysOpenOnClick="True" />
+        </MenuItem>
         <MenuItem Header="Autostart with Windows" IsCheckable="True" IsChecked="{Binding AutoStart}" StaysOpenOnClick="True" />
         <Separator Style="{StaticResource DarkTraySeparatorStyle}" />
         <MenuItem Header="{Binding QuitHeader}" Command="{Binding QuitApplicationCommand}" Style="{StaticResource DarkTrayQuitMenuItemStyle}" StaysOpenOnClick="True" />

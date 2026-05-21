@@ -22,14 +22,30 @@ namespace LowgiHID.HidApi
 #if DEBUG && PRINT
             PrintBuffer($"0x{_ptr:X} - W", buffer);
 #endif
-            var ret = HidWrite(this, buffer, (nuint)buffer.Length);
+            int ret;
+            try
+            {
+                ret = _ptr == IntPtr.Zero ? -1 : HidWrite(this, buffer, (nuint)buffer.Length);
+            }
+            catch
+            {
+                ret = -1;
+            }
 
             return Task.FromResult(ret);
         }
 
         public int Read(byte[] buffer, int count, int timeout)
         {
-            var ret = HidReadTimeOut(this, buffer, (nuint)count, timeout);
+            int ret;
+            try
+            {
+                ret = _ptr == IntPtr.Zero ? -1 : HidReadTimeOut(this, buffer, (nuint)count, timeout);
+            }
+            catch
+            {
+                ret = -1;
+            }
 #if DEBUG && PRINT
             PrintBuffer($"0x{_ptr:X} - R", buffer, ret < 1);
 #endif

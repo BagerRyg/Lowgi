@@ -17,12 +17,12 @@ public class UISettings
 public class IDeviceManagerSettings
 {
     public bool Enabled { get; set; }
+    public int PollPeriod { get; set; } = 600;
 }
 
 public class NativeDeviceManagerSettings : IDeviceManagerSettings
 {
     public int RetryTime { get; set; } = 10;
-    public int PollPeriod { get; set; } = 600;
 
     public IEnumerable<string> DisabledDevices { get; set; } = [];
 }

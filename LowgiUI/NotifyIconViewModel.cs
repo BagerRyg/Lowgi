@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LowgiCore;
 using LowgiCore.Managers;
+using LowgiPrimitives;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Win32;
 using System;
@@ -94,6 +95,44 @@ namespace LowgiUI
             OnPropertyChanged(nameof(LowBatteryWarningThreshold10));
             OnPropertyChanged(nameof(LowBatteryWarningThreshold15));
             OnPropertyChanged(nameof(LowBatteryWarningThreshold20));
+        }
+
+        public bool LedModeWhite
+        {
+            get => _userSettings.LedMode == LogiLedMode.White;
+            set => SetLedMode(value, LogiLedMode.White);
+        }
+
+        public bool LedModeGrey
+        {
+            get => _userSettings.LedMode == LogiLedMode.Grey;
+            set => SetLedMode(value, LogiLedMode.Grey);
+        }
+
+        public bool LedModeLowBattery
+        {
+            get => _userSettings.LedMode == LogiLedMode.LowBattery;
+            set => SetLedMode(value, LogiLedMode.LowBattery);
+        }
+
+        public bool LedModeOff
+        {
+            get => _userSettings.LedMode == LogiLedMode.Off;
+            set => SetLedMode(value, LogiLedMode.Off);
+        }
+
+        private void SetLedMode(bool isChecked, LogiLedMode mode)
+        {
+            if (!isChecked)
+            {
+                return;
+            }
+
+            _userSettings.LedMode = mode;
+            OnPropertyChanged(nameof(LedModeWhite));
+            OnPropertyChanged(nameof(LedModeGrey));
+            OnPropertyChanged(nameof(LedModeLowBattery));
+            OnPropertyChanged(nameof(LedModeOff));
         }
 
         public static string AssemblyVersion

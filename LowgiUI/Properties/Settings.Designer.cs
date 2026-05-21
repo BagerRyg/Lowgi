@@ -85,5 +85,17 @@ namespace LowgiUI.Properties {
                 this["CachedBatteryPercentages"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("LowBattery")]
+        public string LedMode {
+            get {
+                return ((string)(this["LedMode"]));
+            }
+            set {
+                this["LedMode"] = value;
+            }
+        }
     }
 }

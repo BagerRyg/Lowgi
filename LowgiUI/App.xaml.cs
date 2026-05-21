@@ -27,38 +27,66 @@ public partial class App : Application
         base.OnStartup(e);
 
         Directory.SetCurrentDirectory(AppContext.BaseDirectory);
-        Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-        CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
-        AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CrashHandler);
-
-        EnableEfficiencyMode();
-
-        var builder = Host.CreateEmptyApplicationBuilder(null);
-        await LoadAppSettings(builder.Configuration);
-
-        builder.Services.Configure<AppSettings>(builder.Configuration);
-        builder.Services.AddLowgiMessagePipe(true);
-        builder.Services.AddSingleton<UserSettingsWrapper>();
-
-        builder.Services.AddSingleton<LogiDeviceIconFactory>();
-        builder.Services.AddSingleton<LogiDeviceViewModelFactory>();
-        builder.Services.AddSingleton<LowBatteryNotificationService>();
-
-        if (builder.Configuration.Get<AppSettings>()?.Native.Enabled == true)
+        CrashLog.ConfigureNativeCrashDumps("Lowgi.exe");
+        CrashLog.WriteRunEvent("startup");
+        CrashLog.StartHeartbeat();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
-            builder.Services.AddSingleton<LowgiNativeDeviceManager>();
-            builder.Services.AddSingleton<IDeviceManager>(p => p.GetRequiredService<LowgiNativeDeviceManager>());
-            builder.Services.AddSingleton<IHostedService>(p => p.GetRequiredService<LowgiNativeDeviceManager>());
+            CrashLog.WriteRunEvent("process exit");
+            CrashLog.StopHeartbeat();
+        };
+        AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CrashHandler);
+        DispatcherUnhandledException += (_, args) =>
+        {
+            CrashLog.Write(args.Exception, "DispatcherUnhandledException");
+            args.Handled = true;
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            CrashLog.Write(args.Exception, "UnobservedTaskException");
+            args.SetObserved();
+        };
+
+        try
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+
+            EnableEfficiencyMode();
+
+            var builder = Host.CreateEmptyApplicationBuilder(null);
+            await LoadAppSettings(builder.Configuration);
+
+            builder.Services.Configure<AppSettings>(builder.Configuration);
+            builder.Services.AddLowgiMessagePipe(true);
+            builder.Services.AddSingleton<UserSettingsWrapper>();
+
+            builder.Services.AddSingleton<LogiDeviceIconFactory>();
+            builder.Services.AddSingleton<LogiDeviceViewModelFactory>();
+            builder.Services.AddSingleton<LowBatteryNotificationService>();
+
+            if (builder.Configuration.Get<AppSettings>()?.Native.Enabled == true)
+            {
+                builder.Services.AddSingleton<LowgiNativeDeviceManager>();
+                builder.Services.AddSingleton<IDeviceManager>(p => p.GetRequiredService<LowgiNativeDeviceManager>());
+                builder.Services.AddSingleton<IHostedService>(p => p.GetRequiredService<LowgiNativeDeviceManager>());
+            }
+            builder.Services.AddIDeviceManager<GHubManager>(builder.Configuration);
+            builder.Services.AddSingleton<ILogiDeviceCollection, LogiDeviceCollection>();
+
+            builder.Services.AddSingleton<MainTaskbarIconWrapper>();
+            builder.Services.AddHostedService<NotifyIconViewModel>();
+
+            var host = builder.Build();
+            await host.RunAsync();
+            CrashLog.WriteRunEvent("host stopped");
+            Dispatcher.InvokeShutdown();
         }
-        builder.Services.AddIDeviceManager<GHubManager>(builder.Configuration);
-        builder.Services.AddSingleton<ILogiDeviceCollection, LogiDeviceCollection>();
-
-        builder.Services.AddSingleton<MainTaskbarIconWrapper>();
-        builder.Services.AddHostedService<NotifyIconViewModel>();
-
-        var host = builder.Build();
-        await host.RunAsync();
-        Dispatcher.InvokeShutdown();
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex, "Startup");
+            throw;
+        }
     }
 
     static async Task LoadAppSettings(Microsoft.Extensions.Configuration.ConfigurationManager config)
@@ -93,10 +121,9 @@ public partial class App : Application
 
     private void CrashHandler(object sender, UnhandledExceptionEventArgs args)
     {
-        Exception e = (Exception)args.ExceptionObject;
-        long unixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
-
-        using StreamWriter writer = new($"./crashlog_{unixTime}.log", false);
-        writer.WriteLine(e.ToString());
+        if (args.ExceptionObject is Exception exception)
+        {
+            CrashLog.Write(exception, "UnhandledException");
+        }
     }
 }

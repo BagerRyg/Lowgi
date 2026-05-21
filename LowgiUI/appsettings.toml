@@ -3,6 +3,7 @@ enableRichToolTips = true
 
 [GHub]
 enabled = true
+pollPeriod = 10
 
 [Native]
 enabled = true

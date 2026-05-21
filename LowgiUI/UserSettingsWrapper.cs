@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using LowgiPrimitives;
 using System;
 using System.Collections.Specialized;
 using System.Globalization;
@@ -18,7 +19,7 @@ namespace LowgiUI
             set
             {
                 Properties.Settings.Default.NumericDisplay = value;
-                Properties.Settings.Default.Save();
+                SaveSettings();
 
                 OnPropertyChanged();
             }
@@ -30,7 +31,7 @@ namespace LowgiUI
             set
             {
                 Properties.Settings.Default.LowBatteryWarning = value;
-                Properties.Settings.Default.Save();
+                SaveSettings();
 
                 OnPropertyChanged();
             }
@@ -42,7 +43,24 @@ namespace LowgiUI
             set
             {
                 Properties.Settings.Default.LowBatteryWarningThreshold = value;
-                Properties.Settings.Default.Save();
+                SaveSettings();
+
+                OnPropertyChanged();
+            }
+        }
+
+        public LogiLedMode LedMode
+        {
+            get
+            {
+                return Enum.TryParse(Properties.Settings.Default.LedMode, true, out LogiLedMode ledMode)
+                    ? ledMode
+                    : LogiLedMode.LowBattery;
+            }
+            set
+            {
+                Properties.Settings.Default.LedMode = value.ToString();
+                SaveSettings();
 
                 OnPropertyChanged();
             }
@@ -56,7 +74,7 @@ namespace LowgiUI
             }
 
             Properties.Settings.Default.SelectedDevices.Add(deviceId);
-            Properties.Settings.Default.Save();
+            SaveSettings();
 
             OnPropertyChanged(nameof(SelectedDevices));
         }
@@ -64,7 +82,7 @@ namespace LowgiUI
         public void RemoveDevice(string deviceId)
         {
             Properties.Settings.Default.SelectedDevices.Remove(deviceId);
-            Properties.Settings.Default.Save();
+            SaveSettings();
 
             OnPropertyChanged(nameof(SelectedDevices));
         }
@@ -93,7 +111,18 @@ namespace LowgiUI
             }
 
             CachedBatteryPercentages.Add($"{prefix}{batteryPercentage.ToString(CultureInfo.InvariantCulture)}");
-            Properties.Settings.Default.Save();
+            SaveSettings();
+        }
+
+        private static void SaveSettings()
+        {
+            try
+            {
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception ex) when (ex is System.Configuration.ConfigurationErrorsException or UnauthorizedAccessException)
+            {
+            }
         }
     }
 }

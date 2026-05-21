@@ -2,6 +2,7 @@ using LowgiPrimitives;
 using LowgiPrimitives.MessageStructs;
 using MessagePipe;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
@@ -68,12 +69,16 @@ namespace LowgiCore.Managers
         private static partial Regex BatteryDeviceStateRegex();
 
         private readonly IPublisher<IPCMessage> _deviceEventBus;
+        private readonly AppSettings _appSettings;
+        private readonly HashSet<string> _batteryDeviceIds = [];
+        private CancellationTokenSource? _pollCts;
 
         protected WebsocketClient? _ws;
 
-        public GHubManager(IPublisher<IPCMessage> deviceEventBus)
+        public GHubManager(IPublisher<IPCMessage> deviceEventBus, IOptions<AppSettings> appSettings)
         {
             _deviceEventBus = deviceEventBus;
+            _appSettings = appSettings.Value;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -128,10 +133,14 @@ namespace LowgiCore.Managers
             }));
 
             LoadDevices();
+            StartBatteryPolling(cancellationToken);
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
+            _pollCts?.Cancel();
+            _pollCts?.Dispose();
+            _pollCts = null;
             _ws?.Dispose();
 
             return Task.CompletedTask;
@@ -181,19 +190,20 @@ namespace LowgiCore.Managers
                     }
 
                     string deviceId = deviceToken["id"]!.ToString();
+                    bool hasBattery = (bool)deviceToken["capabilities"]!["hasBatteryStatus"]!;
+                    if (hasBattery)
+                    {
+                        _batteryDeviceIds.Add(deviceId);
+                    }
+
                     _deviceEventBus.Publish(new InitMessage(
                         deviceId,
                         deviceToken["extendedDisplayName"]!.ToString(),
-                        (bool) deviceToken["capabilities"]!["hasBatteryStatus"]!,
+                        hasBattery,
                         deviceType
                     ));
 
-                    _ws?.Send(JsonConvert.SerializeObject(new
-                    {
-                        msgId = "",
-                        verb = "GET",
-                        path = $"/battery/{deviceId}/state"
-                    }));
+                    PollBattery(deviceId);
                 }
             }
             catch (Exception e)
@@ -219,6 +229,44 @@ namespace LowgiCore.Managers
                 ));
             }
             catch { }
+        }
+
+        private void StartBatteryPolling(CancellationToken cancellationToken)
+        {
+            _pollCts?.Cancel();
+            _pollCts?.Dispose();
+            _pollCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            CancellationToken token = _pollCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await Task.Delay(Math.Max(1, _appSettings.GHub.PollPeriod) * 1000, token);
+
+                        foreach (var deviceId in _batteryDeviceIds.ToArray())
+                        {
+                            PollBattery(deviceId);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
+            }, token);
+        }
+
+        private void PollBattery(string deviceId)
+        {
+            _ws?.Send(JsonConvert.SerializeObject(new
+            {
+                msgId = "",
+                verb = "GET",
+                path = $"/battery/{deviceId}/state"
+            }));
         }
 
         public async void RediscoverDevices()
