@@ -240,11 +240,18 @@ namespace LowgiCore.Managers
 
             _ = Task.Run(async () =>
             {
+                DateTimeOffset lastPoll = DateTimeOffset.MinValue;
                 while (!token.IsCancellationRequested)
                 {
                     try
                     {
-                        await Task.Delay(Math.Max(1, _appSettings.GHub.PollPeriod) * 1000, token);
+                        await Task.Delay(1000, token);
+                        if (DateTimeOffset.Now < lastPoll.AddSeconds(RuntimeSettings.BatteryPollingIntervalSeconds))
+                        {
+                            continue;
+                        }
+
+                        lastPoll = DateTimeOffset.Now;
 
                         foreach (var deviceId in _batteryDeviceIds.ToArray())
                         {

@@ -10,6 +10,25 @@ public static class CrashLog
     private static int _writeCount;
     private static Timer? _heartbeatTimer;
 
+    public static bool Enabled { get; private set; }
+
+    public static void SetEnabled(bool enabled, string executableName = "Lowgi.exe")
+    {
+        Enabled = enabled;
+
+        if (enabled)
+        {
+            ConfigureNativeCrashDumps(executableName);
+            StartHeartbeat();
+            WriteRunEvent("logging enabled");
+        }
+        else
+        {
+            StopHeartbeat();
+            DisableNativeCrashDumps(executableName);
+        }
+    }
+
     public static string LogDirectory
     {
         get
@@ -22,6 +41,11 @@ public static class CrashLog
 
     public static void ConfigureNativeCrashDumps(string executableName)
     {
+        if (!Enabled)
+        {
+            return;
+        }
+
         if (!OperatingSystem.IsWindows())
         {
             return;
@@ -42,8 +66,30 @@ public static class CrashLog
         }
     }
 
+    public static void DisableNativeCrashDumps(string executableName)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            string keyPath = $@"Software\Microsoft\Windows\Windows Error Reporting\LocalDumps\{executableName}";
+            Registry.CurrentUser.DeleteSubKeyTree(keyPath, false);
+        }
+        catch
+        {
+        }
+    }
+
     public static void StartHeartbeat()
     {
+        if (!Enabled)
+        {
+            return;
+        }
+
         _heartbeatTimer ??= new Timer(_ => WriteHeartbeat(), null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
     }
 
@@ -55,6 +101,11 @@ public static class CrashLog
 
     public static void Write(Exception exception, string source)
     {
+        if (!Enabled)
+        {
+            return;
+        }
+
         try
         {
             long unixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
@@ -77,6 +128,11 @@ public static class CrashLog
 
     public static void WriteRunEvent(string message)
     {
+        if (!Enabled)
+        {
+            return;
+        }
+
         try
         {
             File.AppendAllText(
@@ -90,6 +146,11 @@ public static class CrashLog
 
     private static void WriteHeartbeat()
     {
+        if (!Enabled)
+        {
+            return;
+        }
+
         try
         {
             File.WriteAllText(

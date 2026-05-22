@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
+using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,6 +98,44 @@ namespace LowgiUI
             OnPropertyChanged(nameof(LowBatteryWarningThreshold20));
         }
 
+        public bool BatteryPollingInterval1
+        {
+            get => _userSettings.BatteryPollingIntervalMinutes == 1;
+            set => SetBatteryPollingInterval(value, 1);
+        }
+
+        public bool BatteryPollingInterval3
+        {
+            get => _userSettings.BatteryPollingIntervalMinutes == 3;
+            set => SetBatteryPollingInterval(value, 3);
+        }
+
+        public bool BatteryPollingInterval5
+        {
+            get => _userSettings.BatteryPollingIntervalMinutes == 5;
+            set => SetBatteryPollingInterval(value, 5);
+        }
+
+        public bool BatteryPollingInterval10
+        {
+            get => _userSettings.BatteryPollingIntervalMinutes == 10;
+            set => SetBatteryPollingInterval(value, 10);
+        }
+
+        private void SetBatteryPollingInterval(bool isChecked, int minutes)
+        {
+            if (!isChecked)
+            {
+                return;
+            }
+
+            _userSettings.BatteryPollingIntervalMinutes = minutes;
+            OnPropertyChanged(nameof(BatteryPollingInterval1));
+            OnPropertyChanged(nameof(BatteryPollingInterval3));
+            OnPropertyChanged(nameof(BatteryPollingInterval5));
+            OnPropertyChanged(nameof(BatteryPollingInterval10));
+        }
+
         public bool LedModeWhite
         {
             get => _userSettings.LedMode == LogiLedMode.White;
@@ -140,6 +179,31 @@ namespace LowgiUI
             get
             {
                 return "v" + Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "Missing";
+            }
+        }
+
+        public string BuildNumberLabel
+        {
+            get
+            {
+                string baseDirectory = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string? folderName = Path.GetFileName(baseDirectory);
+                string buildNumber = !string.IsNullOrWhiteSpace(folderName)
+                    && folderName.StartsWith("Build ", StringComparison.OrdinalIgnoreCase)
+                        ? folderName
+                        : AssemblyVersion;
+
+                return $"Version 3 - {buildNumber}";
+            }
+        }
+
+        public bool EnableLogging
+        {
+            get => _userSettings.EnableLogging;
+            set
+            {
+                _userSettings.EnableLogging = value;
+                OnPropertyChanged();
             }
         }
 

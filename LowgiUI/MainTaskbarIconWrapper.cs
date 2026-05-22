@@ -1,15 +1,73 @@
 using Hardcodet.Wpf.TaskbarNotification;
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 
 namespace LowgiUI;
 
-public class MainTaskBarIcon : TaskbarIcon
+public partial class MainTaskBarIcon : TaskbarIcon
 {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetCursorPos(out Point point);
+
     public MainTaskBarIcon() : base()
     {
-        ContextMenu = (System.Windows.Controls.ContextMenu) Application.Current.FindResource("SysTrayMenu");
+        ContextMenu = (ContextMenu)Application.Current.FindResource("SysTrayMenu");
+        ContextMenu.Opened += PositionContextMenu;
         BatteryIconDrawing.DrawUnknown(this);
+    }
+
+    public new void Dispose()
+    {
+        if (ContextMenu != null)
+        {
+            ContextMenu.Opened -= PositionContextMenu;
+        }
+
+        base.Dispose();
+    }
+
+    public static void PositionContextMenu(object sender, RoutedEventArgs e)
+    {
+        if (sender is ContextMenu menu)
+        {
+            _ = menu.Dispatcher.BeginInvoke(() => PositionContextMenu(menu));
+        }
+    }
+
+    private static void PositionContextMenu(ContextMenu menu)
+    {
+        double menuWidth = menu.ActualWidth > 0 ? menu.ActualWidth : 280;
+        double menuHeight = menu.ActualHeight > 0 ? menu.ActualHeight : 360;
+        double cursorX = GetCursorX(menu);
+        double targetX = cursorX - (menuWidth / 2);
+
+        menu.Placement = PlacementMode.Absolute;
+        menu.HorizontalOffset = Math.Clamp(targetX, SystemParameters.WorkArea.Left + 4, SystemParameters.WorkArea.Right - menuWidth - 4);
+        menu.VerticalOffset = Math.Max(0, SystemParameters.WorkArea.Bottom - menuHeight - 4);
+    }
+
+    private static double GetCursorX(ContextMenu menu)
+    {
+        if (!GetCursorPos(out Point cursor))
+        {
+            return SystemParameters.WorkArea.Right;
+        }
+
+        PresentationSource? source = PresentationSource.FromVisual(menu);
+        Matrix transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        return transform.Transform(new System.Windows.Point(cursor.X, cursor.Y)).X;
     }
 }
 

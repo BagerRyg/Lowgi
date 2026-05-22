@@ -192,9 +192,9 @@ namespace LowgiHID
 
             _getBatteryAsync = FeatureMap switch
             {
+                { } when FeatureMap.ContainsKey(0x1004) => Battery1004.GetBatteryAsync,
                 { } when FeatureMap.ContainsKey(0x1000) => Battery1000.GetBatteryAsync,
                 { } when FeatureMap.ContainsKey(0x1001) => Battery1001.GetBatteryAsync,
-                { } when FeatureMap.ContainsKey(0x1004) => Battery1004.GetBatteryAsync,
                 _ => null
             };
 
@@ -224,7 +224,9 @@ namespace LowgiHID
 #endif
                     if (now < expectedUpdateTime)
                     {
-                        await Task.Delay((int)(expectedUpdateTime - now).TotalMilliseconds);
+                        var delay = expectedUpdateTime - now;
+                        await Task.Delay(Math.Min((int)delay.TotalMilliseconds, 1000));
+                        continue;
                     }
 
                     await UpdateBattery();
@@ -243,6 +245,11 @@ namespace LowgiHID
             if (ret == null) { return; }
 
             var batStatus = ret.Value;
+            if (!IsPlausibleBatteryUpdate(batStatus))
+            {
+                return;
+            }
+
             lastUpdate = DateTimeOffset.Now;
             hasBatteryReturn = true;
 
@@ -257,6 +264,33 @@ namespace LowgiHID
                 IPCMessageType.UPDATE,
                 new UpdateMessage(Identifier, batStatus.batteryPercentage, batStatus.status, batStatus.batteryMVolt, lastUpdate)
             );
+        }
+
+        private bool IsPlausibleBatteryUpdate(BatteryUpdateReturn batStatus)
+        {
+            if (batStatus.batteryPercentage is < 0 or > 100)
+            {
+                return false;
+            }
+
+            if (!hasBatteryReturn)
+            {
+                return true;
+            }
+
+            bool wasCharging = lastBatteryReturn.status
+                is PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
+                or PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL;
+            bool isCharging = batStatus.status
+                is PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
+                or PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL;
+
+            if (!wasCharging && !isCharging && batStatus.batteryPercentage > lastBatteryReturn.batteryPercentage + 5)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private async Task InitLedAsync()
@@ -552,6 +586,11 @@ namespace LowgiHID
 
         private static void LogLed(string message)
         {
+            if (!CrashLog.Enabled)
+            {
+                return;
+            }
+
             try
             {
                 File.AppendAllText(

@@ -27,9 +27,9 @@ public partial class App : Application
         base.OnStartup(e);
 
         Directory.SetCurrentDirectory(AppContext.BaseDirectory);
-        CrashLog.ConfigureNativeCrashDumps("Lowgi.exe");
+        CrashLog.SetEnabled(LowgiUI.Properties.Settings.Default.EnableLogging, "Lowgi.exe");
+        RuntimeSettings.SetBatteryPollingIntervalMinutes(LowgiUI.Properties.Settings.Default.BatteryPollingIntervalMinutes);
         CrashLog.WriteRunEvent("startup");
-        CrashLog.StartHeartbeat();
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
             CrashLog.WriteRunEvent("process exit");

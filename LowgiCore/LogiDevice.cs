@@ -34,6 +34,7 @@ namespace LowgiCore
 
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ToolTipString))]
         private PowerSupplyStatus _powerSupplyStatus;
 
         [ObservableProperty]
@@ -45,12 +46,16 @@ namespace LowgiCore
             get
             {
 #if DEBUG
-                return $"{DeviceName}, {BatteryPercentage:f0}% - {LastUpdate}";
+                return $"{DeviceName}, {BatteryPercentage:f0}%{ChargingLabel} - {LastUpdate}";
 #else
-                return $"{DeviceName}, {BatteryPercentage:f0}%";
+                return $"{DeviceName}, {BatteryPercentage:f0}%{ChargingLabel}";
 #endif
             }
         }
+
+        private string ChargingLabel => PowerSupplyStatus == PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
+            ? " (Charging)"
+            : string.Empty;
 
         public Func<Task>? UpdateBatteryFunc;
         public async Task UpdateBatteryAsync()

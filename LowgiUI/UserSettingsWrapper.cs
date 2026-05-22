@@ -66,6 +66,32 @@ namespace LowgiUI
             }
         }
 
+        public bool EnableLogging
+        {
+            get => Properties.Settings.Default.EnableLogging;
+            set
+            {
+                Properties.Settings.Default.EnableLogging = value;
+                SaveSettings();
+                CrashLog.SetEnabled(value, "Lowgi.exe");
+
+                OnPropertyChanged();
+            }
+        }
+
+        public int BatteryPollingIntervalMinutes
+        {
+            get => Properties.Settings.Default.BatteryPollingIntervalMinutes;
+            set
+            {
+                Properties.Settings.Default.BatteryPollingIntervalMinutes = value;
+                SaveSettings();
+                RuntimeSettings.SetBatteryPollingIntervalMinutes(value);
+
+                OnPropertyChanged();
+            }
+        }
+
         public void AddDevice(string deviceId)
         {
             if (Properties.Settings.Default.SelectedDevices.Contains(deviceId))

@@ -30,6 +30,7 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         GlobalSettings.settings = _appSettings.Native;
+        GlobalSettings.settings.PollPeriod = RuntimeSettings.BatteryPollingIntervalSeconds;
 
         try
         {
@@ -84,6 +85,10 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
             or nameof(UserSettingsWrapper.SelectedDevices))
         {
             ApplyLedMode();
+        }
+        else if (e.PropertyName is nameof(UserSettingsWrapper.BatteryPollingIntervalMinutes))
+        {
+            GlobalSettings.settings.PollPeriod = RuntimeSettings.BatteryPollingIntervalSeconds;
         }
     }
 

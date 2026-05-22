@@ -97,5 +97,29 @@ namespace LowgiUI.Properties {
                 this["LedMode"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableLogging {
+            get {
+                return ((bool)(this["EnableLogging"]));
+            }
+            set {
+                this["EnableLogging"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public int BatteryPollingIntervalMinutes {
+            get {
+                return ((int)(this["BatteryPollingIntervalMinutes"]));
+            }
+            set {
+                this["BatteryPollingIntervalMinutes"] = value;
+            }
+        }
     }
 }

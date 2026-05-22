@@ -24,5 +24,11 @@
     <Setting Name="LedMode" Type="System.String" Scope="User">
       <Value Profile="(Default)">LowBattery</Value>
     </Setting>
+    <Setting Name="EnableLogging" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="BatteryPollingIntervalMinutes" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">5</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

@@ -229,6 +229,11 @@ namespace LowgiHID
 
         private static void LogHidDevice(string action, HidDeviceInfo deviceInfo, HidppMessageType messageType)
         {
+            if (!CrashLog.Enabled)
+            {
+                return;
+            }
+
             try
             {
                 string logPath = Path.Combine(AppContext.BaseDirectory, "hid_devices.log");

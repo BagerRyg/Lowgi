@@ -54,6 +54,7 @@ namespace LowgiUI
 
         private static Color GetDeviceColor(LogiDevice device, int lowBatteryThreshold = 0) => device switch
         {
+            { PowerSupplyStatus: PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING } => Color.FromArgb(0x22, 0xF7, 0x65),
             { BatteryPercentage: >= 0 } when device.BatteryPercentage <= lowBatteryThreshold
                 && device.PowerSupplyStatus != PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING => Color.FromArgb(0xF5, 0x9E, 0x0B),
             _ => CheckTheme.LightTheme ? Color.FromArgb(0x11, 0x11, 0x11) : Color.FromArgb(0xEE, 0xEE, 0xEE)
@@ -125,10 +126,11 @@ namespace LowgiUI
             using Graphics g = Graphics.FromImage(b);
 
             string displayString = (device.BatteryPercentage < 0) ? "?" : $"{device.BatteryPercentage:f0}";
+            using SolidBrush brush = new(GetDeviceColor(device, lowBatteryThreshold));
             g.DrawString(
                 displayString,
                 new Font("Segoe UI", (int)(0.8 * ImageSize), GraphicsUnit.Pixel),
-                new SolidBrush(GetDeviceColor(device, lowBatteryThreshold)),
+                brush,
                 ImageSize / 2, ImageSize / 2,
                 new(StringFormatFlags.FitBlackBox, 0)
                 {

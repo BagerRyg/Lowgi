@@ -40,6 +40,7 @@ namespace LowgiUI
                 {
                     // TODO: dispose managed state (managed objects)
                     SubRef();
+                    taskbarIcon.ContextMenu.Opened -= MainTaskBarIcon.PositionContextMenu;
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
@@ -91,6 +92,7 @@ namespace LowgiUI
             if (!appSettings.UI.EnableRichToolTips)
                 taskbarIcon.TrayToolTip = null;
 
+            taskbarIcon.ContextMenu.Opened += MainTaskBarIcon.PositionContextMenu;
             AddRef();
 
             DataContext = device;

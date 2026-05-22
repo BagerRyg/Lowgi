@@ -46,8 +46,8 @@
                                   Margin="0,0,12,0" />
 
                 <TextBlock x:Name="SubmenuArrow"
-                           Text="&#x203A;"
-                           Grid.Column="2"
+                           Text="{Binding Path=(local:TrayMenuDirection.SubmenuArrowText), RelativeSource={RelativeSource TemplatedParent}}"
+                           Grid.Column="{Binding Path=(local:TrayMenuDirection.SubmenuArrowColumn), RelativeSource={RelativeSource TemplatedParent}}"
                            FontSize="20"
                            Foreground="{TemplateBinding Foreground}"
                            HorizontalAlignment="Center"
@@ -139,8 +139,8 @@
                                   Margin="0,0,12,0" />
 
                 <TextBlock x:Name="SubmenuArrow"
-                           Text="&#x203A;"
-                           Grid.Column="2"
+                           Text="{Binding Path=(local:TrayMenuDirection.SubmenuArrowText), RelativeSource={RelativeSource TemplatedParent}}"
+                           Grid.Column="{Binding Path=(local:TrayMenuDirection.SubmenuArrowColumn), RelativeSource={RelativeSource TemplatedParent}}"
                            FontSize="20"
                            Foreground="{TemplateBinding Foreground}"
                            HorizontalAlignment="Center"
@@ -152,13 +152,17 @@
                        AllowsTransparency="True"
                        Focusable="False"
                        IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
-                       Placement="Right"
+                       Placement="{Binding Path=(local:TrayMenuDirection.SubmenuPopupPlacement), RelativeSource={RelativeSource TemplatedParent}}"
+                       PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                       HorizontalOffset="{Binding Path=(local:TrayMenuDirection.SubmenuPopupHorizontalOffset), RelativeSource={RelativeSource TemplatedParent}}"
                        PopupAnimation="Fade">
-                    <Border Background="{StaticResource TrayMenuBackgroundBrush}"
+                    <Border x:Name="PopupBorder"
+                            Background="{StaticResource TrayMenuBackgroundBrush}"
                             BorderBrush="{StaticResource TrayMenuBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Padding="4">
+                            Padding="{Binding Path=(local:TrayMenuDirection.SubmenuPopupPadding), RelativeSource={RelativeSource TemplatedParent}}"
+                            Margin="{Binding Path=(local:TrayMenuDirection.SubmenuPopupMargin), RelativeSource={RelativeSource TemplatedParent}}">
                         <ScrollViewer CanContentScroll="True"
                                       Style="{DynamicResource DarkTrayScrollViewerStyle}">
                             <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
@@ -326,6 +330,9 @@
                  BorderBrush="{StaticResource TrayMenuBorderBrush}"
                  BorderThickness="1"
                  Padding="4"
+                 Placement="Top"
+                 VerticalOffset="-6"
+                 local:TrayMenuDirection.AutoFlipSubmenus="True"
                  ItemsPanel="{StaticResource DarkTrayItemsPanelTemplate}"
                  ItemContainerStyle="{StaticResource DarkTrayMainMenuItemStyle}"
                  Style="{StaticResource DarkTrayContextMenuStyle}">
@@ -371,7 +378,17 @@
             <MenuItem Header="Low Battery" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeLowBattery}" StaysOpenOnClick="True" />
             <MenuItem Header="Off" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeOff}" StaysOpenOnClick="True" />
         </MenuItem>
-        <MenuItem Header="Autostart with Windows" IsCheckable="True" IsChecked="{Binding AutoStart}" StaysOpenOnClick="True" />
+        <MenuItem Header="Advanced">
+            <MenuItem Header="Update interval">
+                <MenuItem Header="1 min" MinWidth="120" IsCheckable="True" IsChecked="{Binding BatteryPollingInterval1}" StaysOpenOnClick="True" />
+                <MenuItem Header="3 min" MinWidth="120" IsCheckable="True" IsChecked="{Binding BatteryPollingInterval3}" StaysOpenOnClick="True" />
+                <MenuItem Header="5 min" MinWidth="120" IsCheckable="True" IsChecked="{Binding BatteryPollingInterval5}" StaysOpenOnClick="True" />
+                <MenuItem Header="10 min" MinWidth="120" IsCheckable="True" IsChecked="{Binding BatteryPollingInterval10}" StaysOpenOnClick="True" />
+            </MenuItem>
+            <MenuItem Header="Autostart with Windows" MinWidth="180" IsCheckable="True" IsChecked="{Binding AutoStart}" StaysOpenOnClick="True" />
+            <MenuItem Header="Enable logging" MinWidth="180" IsCheckable="True" IsChecked="{Binding EnableLogging}" StaysOpenOnClick="True" />
+            <MenuItem Header="{Binding BuildNumberLabel}" MinWidth="180" IsEnabled="False" />
+        </MenuItem>
         <Separator Style="{StaticResource DarkTraySeparatorStyle}" />
         <MenuItem Header="{Binding QuitHeader}" Command="{Binding QuitApplicationCommand}" Style="{StaticResource DarkTrayQuitMenuItemStyle}" StaysOpenOnClick="True" />
     </ContextMenu>
