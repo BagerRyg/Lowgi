@@ -1,8 +1,6 @@
-<a id="readme-top"></a>
-
 [![.NET 10][dotnet-shield]][dotnet-url]
 [![Windows][windows-shield]][windows-url]
-[![Issues][issues-shield]][issues-url]
+[![Report Bugs][bugs-shield]][bugs-url]
 [![GPL-3.0 License][license-shield]][license-url]
 
 <br />
@@ -24,17 +22,14 @@ The app can show either a numeric battery percentage tray icon or a small device
 
 This project is a fork of [andyvorld/LGSTrayBattery](https://github.com/andyvorld/LGSTrayBattery) by `andyvorld`.
 
-> Note: I have only been able to validate and test Lowgi with a single Logitech Lightspeed device. It should technically work with other Lightspeed/wireless enabled Logitech devices, but I would really like feedback from anyone testing it with a different device.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+> [!WARNING]
+> I have only been able to validate and test Lowgi with a single Logitech Lightspeed device. It should technically work with other Lightspeed/wireless enabled Logitech devices, but I would really like feedback from anyone testing it with a different device.
 
 ## Built With
 
 * [![.NET 10][dotnet-shield]][dotnet-url]
 * WPF
 * Native Logitech HID++ communication
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Features
 
@@ -50,8 +45,6 @@ This project is a fork of [andyvorld/LGSTrayBattery](https://github.com/andyvorl
 * Defaults to the current Windows app theme on first start.
 * Single-instance protection so only one Lowgi process should run at once.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 ## Screenshots
 
 ### Tray Menu
@@ -61,8 +54,6 @@ This project is a fork of [andyvorld/LGSTrayBattery](https://github.com/andyvorl
 ### Low Battery Notification
 
 ![Lowgi low battery notification](Assets/Notification_warning.png)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## How It Works
 
@@ -78,8 +69,6 @@ HKCU\Software\Microsoft\Windows\CurrentVersion\Run
 
 That means the startup entry is per-user and does not require administrator rights.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 ## LED Modes
 
 Lowgi supports several LED modes for devices that expose compatible Logitech LED controls:
@@ -91,8 +80,6 @@ Lowgi supports several LED modes for devices that expose compatible Logitech LED
 * **Always Off**: Turns the LED off.
 
 Behind the scenes, Lowgi reads the latest battery percentage and charging status, maps that state to the selected LED mode, then sends the matching static RGB value to the device LED zones that support it.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Usage
 
@@ -107,8 +94,6 @@ Common options:
 * Enable or disable Windows autostart.
 * Switch between dark and light mode.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 ## Bugs
 
 Please report bugs directly on GitHub:
@@ -117,26 +102,20 @@ Please report bugs directly on GitHub:
 
 If you are using a Logitech device that is not the one I have tested with, please include the exact model name and what works or does not work.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 ## License
 
 Distributed under the GPL-3.0 license. See [LICENSE](LICENSE) for more information.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Acknowledgments
 
 * Forked from [andyvorld/LGSTrayBattery](https://github.com/andyvorld/LGSTrayBattery).
 * Built for [RygTech](https://rygtech.org).
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 [dotnet-shield]: https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white
 [dotnet-url]: https://dotnet.microsoft.com/
 [windows-shield]: https://img.shields.io/badge/Windows-Tray%20App-0078D4?style=for-the-badge&logo=windows&logoColor=white
 [windows-url]: https://www.microsoft.com/windows
-[issues-shield]: https://img.shields.io/github/issues/BagerRyg/Lowgi.svg?style=for-the-badge
-[issues-url]: https://github.com/BagerRyg/Lowgi/issues
+[bugs-shield]: https://img.shields.io/badge/Report-Bugs-red?style=for-the-badge&logo=github
+[bugs-url]: https://github.com/BagerRyg/Lowgi/issues
 [license-shield]: https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=for-the-badge
 [license-url]: LICENSE
