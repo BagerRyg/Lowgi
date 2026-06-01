@@ -22,14 +22,9 @@ The app can show either a numeric battery percentage tray icon or a small device
 
 This project is a fork of [andyvorld/LGSTrayBattery](https://github.com/andyvorld/LGSTrayBattery) by `andyvorld`.
 
-> [!WARNING]
+> [!NOTE]
+> **Please note**
 > I have only been able to validate and test Lowgi with a single Logitech Lightspeed device. It should technically work with other Lightspeed/wireless enabled Logitech devices, but I would really like feedback from anyone testing it with a different device.
-
-## Built With
-
-* [![.NET 10][dotnet-shield]][dotnet-url]
-* WPF
-* Native Logitech HID++ communication
 
 ## Features
 
