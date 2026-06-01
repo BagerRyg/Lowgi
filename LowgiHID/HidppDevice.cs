@@ -208,6 +208,17 @@ namespace LowgiHID
                 new InitMessage(Identifier, DeviceName, _getBatteryAsync != null, (DeviceType)DeviceType)
             );
 
+            CrashLog.WriteDebugInfo(
+                "CONNECTED_DEVICE",
+                $"name={DeviceName}",
+                $"id={Identifier}",
+                $"deviceIndex=0x{_deviceIdx:X2}",
+                $"type={(DeviceType)DeviceType}",
+                $"hasBattery={_getBatteryAsync != null}",
+                $"features={features}",
+                $"ledFeature={ledFeatureIndex}",
+                $"ledZones={_ledZoneCount}");
+
             await UpdateBattery(true);
 
             _ = Task.Run(async () =>
@@ -457,6 +468,9 @@ namespace LowgiHID
 
             switch (ledMode)
             {
+                case LogiLedMode.Dynamic:
+                    (red, green, blue) = GetDynamicLedColor(lowBatteryThreshold);
+                    break;
                 case LogiLedMode.White:
                     red = green = blue = 255;
                     break;
@@ -484,6 +498,36 @@ namespace LowgiHID
             {
                 await SetLedZoneState(zone, enabled, red, green, blue);
             }
+        }
+
+        private (byte Red, byte Green, byte Blue) GetDynamicLedColor(int lowBatteryThreshold)
+        {
+            if (!hasBatteryReturn)
+            {
+                return (128, 128, 128);
+            }
+
+            bool pluggedIn = lastBatteryReturn.status
+                is PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
+                or PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL
+                or PowerSupplyStatus.POWER_SUPPLY_STATUS_NOT_CHARGING;
+
+            if (pluggedIn && lastBatteryReturn.batteryPercentage >= 100)
+            {
+                return (0, 255, 0);
+            }
+
+            if (pluggedIn)
+            {
+                return (255, 128, 0);
+            }
+
+            if (lastBatteryReturn.batteryPercentage <= lowBatteryThreshold)
+            {
+                return (128, 0, 0);
+            }
+
+            return (128, 128, 128);
         }
 
         private async Task ClaimRgbControl()

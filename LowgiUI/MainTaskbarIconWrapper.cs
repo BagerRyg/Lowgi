@@ -1,4 +1,5 @@
 using Hardcodet.Wpf.TaskbarNotification;
+using LowgiCore;
 using System;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -86,22 +87,12 @@ public class MainTaskbarIconWrapper : IDisposable
                 LogiDeviceIcon.RefCountChanged -= OnRefCountChanged;
             }
 
-            // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-            // TODO: set large fields to null
             disposedValue = true;
         }
     }
 
-    // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-    // ~MainTaskbarIconWrapper()
-    // {
-    //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-    //     Dispose(disposing: false);
-    // }
-
     public void Dispose()
     {
-        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
@@ -127,8 +118,13 @@ public class MainTaskbarIconWrapper : IDisposable
         }
     }
 
-    public void ShowWarning(string title, string message)
+    public void ShowWarning(LogiDevice device, string title, string message)
     {
+        if (LogiDeviceIcon.TryShowWarning(device, title, message))
+        {
+            return;
+        }
+
         TaskbarIcon icon = _taskbarIcon ??= new MainTaskBarIcon();
         icon.ShowBalloonTip(title, message, BalloonIcon.Warning);
     }

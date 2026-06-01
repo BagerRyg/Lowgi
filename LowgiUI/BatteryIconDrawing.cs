@@ -4,6 +4,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Drawing.Text;
 using Hardcodet.Wpf.TaskbarNotification;
 using System.Runtime.InteropServices;
 using LowgiPrimitives;
@@ -124,20 +125,13 @@ namespace LowgiUI
         {
             using Bitmap b = new(ImageSize, ImageSize);
             using Graphics g = Graphics.FromImage(b);
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
             string displayString = (device.BatteryPercentage < 0) ? "?" : $"{device.BatteryPercentage:f0}";
+            using Font font = CreateFittingFont(g, displayString);
             using SolidBrush brush = new(GetDeviceColor(device, lowBatteryThreshold));
-            g.DrawString(
-                displayString,
-                new Font("Segoe UI", (int)(0.8 * ImageSize), GraphicsUnit.Pixel),
-                brush,
-                ImageSize / 2, ImageSize / 2,
-                new(StringFormatFlags.FitBlackBox, 0)
-                {
-                    LineAlignment = StringAlignment.Center,
-                    Alignment = StringAlignment.Center,
-                }
-            );
+            using GraphicsPath path = CreateCenteredTextPath(displayString, font);
+            g.FillPath(brush, path);
             g.CompositingMode = CompositingMode.SourceOver;
             g.CompositingQuality = CompositingQuality.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -149,6 +143,53 @@ namespace LowgiUI
             taskbarIcon.Icon = (Icon)tempManagedRes.Clone();
             tempManagedRes.Dispose();
             DestroyIcon(iconHandle);
+        }
+
+        private static Font CreateFittingFont(Graphics graphics, string displayString)
+        {
+            float fontSize = ImageSize * 1.8f;
+            while (fontSize > ImageSize * 0.35f)
+            {
+                Font font = new("Segoe UI", fontSize, FontStyle.Regular, GraphicsUnit.Pixel);
+                using GraphicsPath path = CreateRawTextPath(displayString, font);
+                RectangleF bounds = path.GetBounds();
+                if (bounds.Width <= ImageSize * 0.98f && bounds.Height <= ImageSize * 0.98f)
+                {
+                    return font;
+                }
+
+                font.Dispose();
+                fontSize -= 1;
+            }
+
+            return new Font("Segoe UI", fontSize, GraphicsUnit.Pixel);
+        }
+
+        private static GraphicsPath CreateCenteredTextPath(string displayString, Font font)
+        {
+            GraphicsPath path = CreateRawTextPath(displayString, font);
+            RectangleF bounds = path.GetBounds();
+            using Matrix transform = new();
+            transform.Translate(
+                (ImageSize - bounds.Width) / 2f - bounds.Left,
+                (ImageSize - bounds.Height) / 2f - bounds.Top);
+            path.Transform(transform);
+
+            return path;
+        }
+
+        private static GraphicsPath CreateRawTextPath(string displayString, Font font)
+        {
+            GraphicsPath path = new();
+            path.AddString(
+                displayString,
+                font.FontFamily,
+                (int)font.Style,
+                font.Size,
+                Point.Empty,
+                StringFormat.GenericTypographic);
+
+            return path;
         }
     }
 }

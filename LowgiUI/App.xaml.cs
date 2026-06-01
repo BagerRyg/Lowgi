@@ -1,19 +1,19 @@
 using LowgiCore;
 using LowgiCore.Managers;
+using LowgiPrimitives;
+using LowgiPrimitives.IPC;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Windows;
 using System;
-using LowgiPrimitives.IPC;
 using System.Globalization;
 using System.IO;
 using System.Threading;
-using LowgiPrimitives;
+using System.Threading.Tasks;
+using System.Windows;
 using Tommy.Extensions.Configuration;
 
 using static LowgiUI.AppExtensions;
-using System.Threading.Tasks;
 
 namespace LowgiUI;
 
@@ -22,12 +22,23 @@ namespace LowgiUI;
 /// </summary>
 public partial class App : Application
 {
+    private const string SingleInstanceMutexName = @"Local\LowgiUI.SingleInstance";
+    private Mutex? _singleInstanceMutex;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
-
         Directory.SetCurrentDirectory(AppContext.BaseDirectory);
         CrashLog.SetEnabled(LowgiUI.Properties.Settings.Default.EnableLogging, "Lowgi.exe");
+
+        if (!TryAcquireSingleInstance())
+        {
+            CrashLog.WriteRunEvent("duplicate instance exit");
+            Shutdown();
+            return;
+        }
+
+        base.OnStartup(e);
+
         RuntimeSettings.SetBatteryPollingIntervalMinutes(LowgiUI.Properties.Settings.Default.BatteryPollingIntervalMinutes);
         CrashLog.WriteRunEvent("startup");
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
@@ -58,7 +69,7 @@ public partial class App : Application
             await LoadAppSettings(builder.Configuration);
 
             builder.Services.Configure<AppSettings>(builder.Configuration);
-            builder.Services.AddLowgiMessagePipe(true);
+            builder.Services.AddLowgiMessagePipe(enableInterprocess: false);
             builder.Services.AddSingleton<UserSettingsWrapper>();
 
             builder.Services.AddSingleton<LogiDeviceIconFactory>();
@@ -86,6 +97,34 @@ public partial class App : Application
         {
             CrashLog.Write(ex, "Startup");
             throw;
+        }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
+        base.OnExit(e);
+    }
+
+    private bool TryAcquireSingleInstance()
+    {
+        try
+        {
+            _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out bool createdNew);
+            if (createdNew)
+            {
+                return true;
+            }
+
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex, "SingleInstance");
+            return true;
         }
     }
 

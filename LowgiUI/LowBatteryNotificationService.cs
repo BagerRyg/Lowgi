@@ -46,6 +46,7 @@ public class LowBatteryNotificationService
         Application.Current.Dispatcher.BeginInvoke(() =>
         {
             _mainTaskbarIconWrapper.ShowWarning(
+                device,
                 "Low mouse battery",
                 $"{device.DeviceName} battery is at {percentage}%."
             );

@@ -72,7 +72,11 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
     {
         _deviceEventBus.Publish(message);
 
-        if (message is InitMessage or UpdateMessage)
+        if (message is InitMessage)
+        {
+            _ = RefreshBatteryAndLedMode();
+        }
+        else if (message is UpdateMessage)
         {
             ApplyLedMode();
         }
@@ -103,5 +107,16 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
             _userSettings.LedMode,
             _userSettings.LowBatteryWarningThreshold,
             _userSettings.SelectedDevices.Cast<string>().Where(x => !string.IsNullOrEmpty(x)));
+    }
+
+    private async Task RefreshBatteryAndLedMode()
+    {
+        if (!_started)
+        {
+            return;
+        }
+
+        await HidppManagerContext.Instance.ForceBatteryUpdates();
+        ApplyLedMode();
     }
 }

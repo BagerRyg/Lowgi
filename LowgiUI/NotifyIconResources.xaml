@@ -1,4 +1,4 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:local="clr-namespace:LowgiUI"
                     xmlns:tb="http://www.hardcodet.net/taskbar">
@@ -10,9 +10,13 @@
     <SolidColorBrush x:Key="TrayMenuBorderBrush" Color="#30363D" />
     <SolidColorBrush x:Key="TrayMenuTextBrush" Color="#F0F6FC" />
     <SolidColorBrush x:Key="TrayMenuDisabledTextBrush" Color="#8B949E" />
+    <SolidColorBrush x:Key="TrayMenuTitleBrush" Color="#161B22" />
+    <SolidColorBrush x:Key="TrayMenuButtonBrush" Color="#21262D" />
+    <SolidColorBrush x:Key="TrayMenuLinkBrush" Color="#58A6FF" />
+    <SolidColorBrush x:Key="TrayMenuScrollThumbBrush" Color="#7D8590" />
 
     <ItemsPanelTemplate x:Key="DarkTrayItemsPanelTemplate">
-        <StackPanel Background="{StaticResource TrayMenuBackgroundBrush}" IsItemsHost="True" />
+        <StackPanel Background="{DynamicResource TrayMenuBackgroundBrush}" IsItemsHost="True" />
     </ItemsPanelTemplate>
 
     <ControlTemplate TargetType="{x:Type MenuItem}" x:Key="DarkTrayMenuItemTemplate">
@@ -46,8 +50,8 @@
                                   Margin="0,0,12,0" />
 
                 <TextBlock x:Name="SubmenuArrow"
-                           Text="{Binding Path=(local:TrayMenuDirection.SubmenuArrowText), RelativeSource={RelativeSource TemplatedParent}}"
-                           Grid.Column="{Binding Path=(local:TrayMenuDirection.SubmenuArrowColumn), RelativeSource={RelativeSource TemplatedParent}}"
+                           Text="{Binding Path=(local:TraySubmenuController.SubmenuArrowText), RelativeSource={RelativeSource TemplatedParent}}"
+                           Grid.Column="{Binding Path=(local:TraySubmenuController.SubmenuArrowColumn), RelativeSource={RelativeSource TemplatedParent}}"
                            FontSize="20"
                            Foreground="{TemplateBinding Foreground}"
                            HorizontalAlignment="Center"
@@ -57,10 +61,10 @@
         </Border>
         <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
-                <Setter TargetName="Root" Property="Background" Value="{StaticResource TrayMenuHoverBrush}" />
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource TrayMenuHoverBrush}" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-                <Setter TargetName="Root" Property="Background" Value="{StaticResource TrayMenuPressedBrush}" />
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource TrayMenuPressedBrush}" />
             </Trigger>
             <Trigger Property="IsChecked" Value="True">
                 <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
@@ -72,7 +76,7 @@
                 <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Foreground" Value="{StaticResource TrayMenuDisabledTextBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TrayMenuDisabledTextBrush}" />
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -100,12 +104,25 @@
         </Border>
         <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
-                <Setter TargetName="Root" Property="Background" Value="{StaticResource TrayMenuDangerHoverBrush}" />
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource TrayMenuDangerHoverBrush}" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-                <Setter TargetName="Root" Property="Background" Value="{StaticResource TrayMenuDangerPressedBrush}" />
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource TrayMenuDangerPressedBrush}" />
             </Trigger>
         </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <ControlTemplate TargetType="{x:Type MenuItem}" x:Key="DarkTrayFooterMenuItemTemplate">
+        <Border x:Name="Root"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="4"
+                Margin="0">
+            <ContentPresenter ContentSource="Header"
+                              RecognizesAccessKey="True"
+                              VerticalAlignment="Center" />
+        </Border>
     </ControlTemplate>
 
     <ControlTemplate TargetType="{x:Type MenuItem}" x:Key="DarkTraySubmenuTemplate">
@@ -139,8 +156,8 @@
                                   Margin="0,0,12,0" />
 
                 <TextBlock x:Name="SubmenuArrow"
-                           Text="{Binding Path=(local:TrayMenuDirection.SubmenuArrowText), RelativeSource={RelativeSource TemplatedParent}}"
-                           Grid.Column="{Binding Path=(local:TrayMenuDirection.SubmenuArrowColumn), RelativeSource={RelativeSource TemplatedParent}}"
+                           Text="{Binding Path=(local:TraySubmenuController.SubmenuArrowText), RelativeSource={RelativeSource TemplatedParent}}"
+                           Grid.Column="{Binding Path=(local:TraySubmenuController.SubmenuArrowColumn), RelativeSource={RelativeSource TemplatedParent}}"
                            FontSize="20"
                            Foreground="{TemplateBinding Foreground}"
                            HorizontalAlignment="Center"
@@ -152,31 +169,32 @@
                        AllowsTransparency="True"
                        Focusable="False"
                        IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
-                       Placement="{Binding Path=(local:TrayMenuDirection.SubmenuPopupPlacement), RelativeSource={RelativeSource TemplatedParent}}"
+                       Placement="Custom"
                        PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
-                       HorizontalOffset="{Binding Path=(local:TrayMenuDirection.SubmenuPopupHorizontalOffset), RelativeSource={RelativeSource TemplatedParent}}"
-                       PopupAnimation="Fade">
-                    <Border x:Name="PopupBorder"
-                            Background="{StaticResource TrayMenuBackgroundBrush}"
-                            BorderBrush="{StaticResource TrayMenuBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="{Binding Path=(local:TrayMenuDirection.SubmenuPopupPadding), RelativeSource={RelativeSource TemplatedParent}}"
-                            Margin="{Binding Path=(local:TrayMenuDirection.SubmenuPopupMargin), RelativeSource={RelativeSource TemplatedParent}}">
-                        <ScrollViewer CanContentScroll="True"
-                                      Style="{DynamicResource DarkTrayScrollViewerStyle}">
-                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
-                        </ScrollViewer>
-                    </Border>
+                       PopupAnimation="None">
+                    <Grid>
+                        <Border x:Name="PopupBorder"
+                                Background="{DynamicResource TrayMenuBackgroundBrush}"
+                                BorderBrush="{DynamicResource TrayMenuBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="4"
+                                Margin="{Binding Path=(local:TraySubmenuController.SubmenuBorderMargin), RelativeSource={RelativeSource TemplatedParent}}">
+                            <ScrollViewer CanContentScroll="True"
+                                          Style="{DynamicResource DarkTrayScrollViewerStyle}">
+                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
                 </Popup>
             </Grid>
         </Border>
         <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
-                <Setter TargetName="Root" Property="Background" Value="{StaticResource TrayMenuHoverBrush}" />
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource TrayMenuHoverBrush}" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-                <Setter TargetName="Root" Property="Background" Value="{StaticResource TrayMenuPressedBrush}" />
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource TrayMenuPressedBrush}" />
             </Trigger>
             <Trigger Property="IsChecked" Value="True">
                 <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
@@ -188,7 +206,7 @@
                 <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Foreground" Value="{StaticResource TrayMenuDisabledTextBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TrayMenuDisabledTextBrush}" />
             </Trigger>
         </ControlTemplate.Triggers>
     </ControlTemplate>
@@ -208,7 +226,7 @@
 
     <Style TargetType="{x:Type ScrollBar}" x:Key="DarkTrayScrollBarStyle">
         <Setter Property="Width" Value="10" />
-        <Setter Property="Background" Value="{StaticResource TrayMenuBackgroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource TrayMenuBackgroundBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ScrollBar}">
@@ -218,8 +236,8 @@
                                 <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" />
                             </Track.DecreaseRepeatButton>
                             <Track.Thumb>
-                                <Thumb Background="#7D8590"
-                                       BorderBrush="{StaticResource TrayMenuBorderBrush}"
+                                <Thumb Background="{DynamicResource TrayMenuScrollThumbBrush}"
+                                       BorderBrush="{DynamicResource TrayMenuBorderBrush}"
                                        BorderThickness="0"
                                        Style="{StaticResource DarkTrayScrollThumbStyle}" />
                             </Track.Thumb>
@@ -234,7 +252,7 @@
     </Style>
 
     <Style TargetType="{x:Type ScrollViewer}" x:Key="DarkTrayScrollViewerStyle">
-        <Setter Property="Background" Value="{StaticResource TrayMenuBackgroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource TrayMenuBackgroundBrush}" />
         <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
         <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
         <Setter Property="Template">
@@ -259,19 +277,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Separator}">
-                    <Border Height="1" Margin="10,6" Background="{StaticResource TrayMenuBorderBrush}" />
+                    <Border Height="1" Margin="10,6" Background="{DynamicResource TrayMenuBorderBrush}" />
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
     <ControlTemplate TargetType="{x:Type MenuItem}" x:Key="DarkTrayMenuSeparatorItemTemplate">
-        <Border Height="1" Margin="10,6" Background="{StaticResource TrayMenuBorderBrush}" />
+        <Border Height="1" Margin="10,6" Background="{DynamicResource TrayMenuBorderBrush}" />
     </ControlTemplate>
 
     <Style TargetType="{x:Type ContextMenu}" x:Key="DarkTrayContextMenuStyle">
-        <Setter Property="Background" Value="{StaticResource TrayMenuBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource TrayMenuBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource TrayMenuBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource TrayMenuBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="4" />
         <Setter Property="ItemsPanel" Value="{StaticResource DarkTrayItemsPanelTemplate}" />
@@ -293,7 +311,7 @@
     </Style>
 
     <Style TargetType="{x:Type MenuItem}" x:Key="DarkTrayMenuItemStyle">
-        <Setter Property="Foreground" Value="{StaticResource TrayMenuTextBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TrayMenuTextBrush}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -324,15 +342,79 @@
         <Setter Property="Template" Value="{StaticResource DarkTrayDangerMenuItemTemplate}" />
     </Style>
 
+    <Style TargetType="{x:Type MenuItem}" x:Key="DarkTrayFooterMenuItemStyle" BasedOn="{StaticResource DarkTrayMainMenuItemStyle}">
+        <Setter Property="Template" Value="{StaticResource DarkTrayFooterMenuItemTemplate}" />
+    </Style>
+
+    <Style TargetType="{x:Type Button}" x:Key="TrayThemeButtonStyle">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Margin" Value="2,0,0,0" />
+        <Setter Property="Background" Value="{DynamicResource TrayMenuButtonBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TrayMenuTextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource TrayMenuBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource TrayMenuHoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource TrayMenuPressedBrush}" />
+            </Trigger>
+            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource TrayMenuPressedBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource TrayMenuLinkBrush}" />
+                <Setter Property="BorderThickness" Value="2" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type Button}" x:Key="TrayQuitButtonStyle" BasedOn="{StaticResource TrayThemeButtonStyle}">
+        <Setter Property="Width" Value="Auto" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="Padding" Value="34,0,0,0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource TrayMenuDangerHoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource TrayMenuDangerPressedBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
 	<ContextMenu x:Shared="True"
                  x:Key="SysTrayMenu"
-                 Background="{StaticResource TrayMenuBackgroundBrush}"
-                 BorderBrush="{StaticResource TrayMenuBorderBrush}"
+                 Background="{DynamicResource TrayMenuBackgroundBrush}"
+                 BorderBrush="{DynamicResource TrayMenuBorderBrush}"
                  BorderThickness="1"
                  Padding="4"
                  Placement="Top"
                  VerticalOffset="-6"
-                 local:TrayMenuDirection.AutoFlipSubmenus="True"
+                 local:TraySubmenuController.Enable="True"
                  ItemsPanel="{StaticResource DarkTrayItemsPanelTemplate}"
                  ItemContainerStyle="{StaticResource DarkTrayMainMenuItemStyle}"
                  Style="{StaticResource DarkTrayContextMenuStyle}">
@@ -373,10 +455,11 @@
             <MenuItem Header="20%" MinWidth="120" IsCheckable="True" IsChecked="{Binding LowBatteryWarningThreshold20}" StaysOpenOnClick="True" />
         </MenuItem>
         <MenuItem Header="Mouse LED">
-            <MenuItem Header="White" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeWhite}" StaysOpenOnClick="True" />
-            <MenuItem Header="Grey" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeGrey}" StaysOpenOnClick="True" />
+            <MenuItem Header="Dynamic" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeDynamic}" StaysOpenOnClick="True" />
+            <MenuItem Header="Bright White" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeWhite}" StaysOpenOnClick="True" />
+            <MenuItem Header="Dim White" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeGrey}" StaysOpenOnClick="True" />
             <MenuItem Header="Low Battery" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeLowBattery}" StaysOpenOnClick="True" />
-            <MenuItem Header="Off" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeOff}" StaysOpenOnClick="True" />
+            <MenuItem Header="Always Off" MinWidth="120" IsCheckable="True" IsChecked="{Binding LedModeOff}" StaysOpenOnClick="True" />
         </MenuItem>
         <MenuItem Header="Advanced">
             <MenuItem Header="Update interval">
@@ -386,11 +469,54 @@
                 <MenuItem Header="10 min" MinWidth="120" IsCheckable="True" IsChecked="{Binding BatteryPollingInterval10}" StaysOpenOnClick="True" />
             </MenuItem>
             <MenuItem Header="Autostart with Windows" MinWidth="180" IsCheckable="True" IsChecked="{Binding AutoStart}" StaysOpenOnClick="True" />
-            <MenuItem Header="Enable logging" MinWidth="180" IsCheckable="True" IsChecked="{Binding EnableLogging}" StaysOpenOnClick="True" />
-            <MenuItem Header="{Binding BuildNumberLabel}" MinWidth="180" IsEnabled="False" />
+            <MenuItem Header="Enable debug logging" MinWidth="180" IsCheckable="True" IsChecked="{Binding EnableLogging}" StaysOpenOnClick="True" />
+            <MenuItem Header="About Lowgi" MinWidth="180" Command="{Binding ShowAboutCommand}" />
         </MenuItem>
         <Separator Style="{StaticResource DarkTraySeparatorStyle}" />
-        <MenuItem Header="{Binding QuitHeader}" Command="{Binding QuitApplicationCommand}" Style="{StaticResource DarkTrayQuitMenuItemStyle}" StaysOpenOnClick="True" />
+        <MenuItem Style="{StaticResource DarkTrayFooterMenuItemStyle}" StaysOpenOnClick="True">
+            <MenuItem.Header>
+                <Grid Width="252" Height="28">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="{Binding QuitHeader}"
+                            Command="{Binding DataContext.QuitApplicationCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                            Style="{StaticResource TrayQuitButtonStyle}" />
+                    <StackPanel Orientation="Horizontal"
+                                Grid.Column="1"
+                                HorizontalAlignment="Right">
+                        <Button Command="{Binding DataContext.SetDarkThemeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                Tag="{Binding DataContext.DarkTheme, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                ToolTip="Dark mode"
+                                Style="{StaticResource TrayThemeButtonStyle}">
+                            <Viewbox Width="14" Height="14">
+                                <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Data="M15.5,2.5 C12,3.5 9.5,6.8 9.5,10.5 C9.5,15.2 13.3,19 18,19 C18.8,19 19.6,18.9 20.3,18.7 C18.8,20.7 16.4,22 13.7,22 C8.4,22 4,17.6 4,12.3 C4,7.6 7.4,3.6 11.9,2.7 C13.1,2.4 14.3,2.3 15.5,2.5 Z" />
+                            </Viewbox>
+                        </Button>
+                        <Button Command="{Binding DataContext.SetLightThemeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                Tag="{Binding DataContext.LightTheme, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                ToolTip="Light mode"
+                                Style="{StaticResource TrayThemeButtonStyle}">
+                            <Viewbox Width="15" Height="15">
+                                <Grid Width="24" Height="24">
+                                    <Ellipse Width="8" Height="8"
+                                             Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center" />
+                                    <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="2"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          Data="M12,1 L12,4 M12,20 L12,23 M4.2,4.2 L6.3,6.3 M17.7,17.7 L19.8,19.8 M1,12 L4,12 M20,12 L23,12 M4.2,19.8 L6.3,17.7 M17.7,6.3 L19.8,4.2" />
+                                </Grid>
+                            </Viewbox>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
     </ContextMenu>
 
     <local:ThemeBrushConverter x:Key="ThemeBrushConverter" />

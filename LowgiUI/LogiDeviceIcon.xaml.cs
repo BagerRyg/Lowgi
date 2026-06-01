@@ -3,7 +3,9 @@ using LowgiCore;
 using LowgiPrimitives;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows.Controls;
 
 namespace LowgiUI
@@ -38,34 +40,28 @@ namespace LowgiUI
             {
                 if (disposing)
                 {
-                    // TODO: dispose managed state (managed objects)
+                    _device.PropertyChanged -= LogiDevicePropertyChanged;
+                    _userSettings.PropertyChanged -= NotifyIconViewModelPropertyChanged;
+                    CheckTheme.StaticPropertyChanged -= CheckThemePropertyChanged;
+                    _activeDeviceIcons.Remove(this);
                     SubRef();
                     taskbarIcon.ContextMenu.Opened -= MainTaskBarIcon.PositionContextMenu;
                 }
 
-                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-                // TODO: set large fields to null
                 disposedValue = true;
                 taskbarIcon.Dispose();
             }
         }
 
-        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-        // ~LogiDeviceIcon()
-        // {
-        //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-        //     Dispose(disposing: false);
-        // }
-
         public void Dispose()
         {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
         #endregion
 
         private static int _refCount = 0;
+        private static readonly List<LogiDeviceIcon> _activeDeviceIcons = [];
         public static int RefCount => _refCount;
 
         public static void AddRef()
@@ -82,7 +78,23 @@ namespace LowgiUI
 
         public static event Action<int>? RefCountChanged;
 
+        public static bool TryShowWarning(LogiDevice device, string title, string message)
+        {
+            LogiDeviceIcon? icon = _activeDeviceIcons.FirstOrDefault(x =>
+                x.DataContext is LogiDevice activeDevice
+                && activeDevice.DeviceId == device.DeviceId);
+            if (icon == null)
+            {
+                return false;
+            }
+
+            icon.DrawBatteryIconNow();
+            icon.taskbarIcon.ShowBalloonTip(title, message, BalloonIcon.Warning);
+            return true;
+        }
+
         private Action<TaskbarIcon, LogiDevice> _drawBatteryIcon;
+        private readonly LogiDevice _device;
         private readonly UserSettingsWrapper _userSettings;
 
         public LogiDeviceIcon(LogiDevice device, AppSettings appSettings, UserSettingsWrapper userSettings)
@@ -94,14 +106,21 @@ namespace LowgiUI
 
             taskbarIcon.ContextMenu.Opened += MainTaskBarIcon.PositionContextMenu;
             AddRef();
+            _activeDeviceIcons.Add(this);
 
             DataContext = device;
+            _device = device;
             _userSettings = userSettings;
 
             device.PropertyChanged += LogiDevicePropertyChanged;
             userSettings.PropertyChanged += NotifyIconViewModelPropertyChanged;
-            CheckTheme.StaticPropertyChanged += (_, _) => DrawBatteryIcon();
+            CheckTheme.StaticPropertyChanged += CheckThemePropertyChanged;
             _drawBatteryIcon = userSettings.NumericDisplay ? DrawNumericIcon : BatteryIconDrawing.DrawIcon;
+            DrawBatteryIcon();
+        }
+
+        private void CheckThemePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
             DrawBatteryIcon();
         }
 
@@ -137,7 +156,12 @@ namespace LowgiUI
 
         private void DrawBatteryIcon()
         {
-            _ = Dispatcher.BeginInvoke(() => _drawBatteryIcon(taskbarIcon, (LogiDevice)DataContext));
+            _ = Dispatcher.BeginInvoke(DrawBatteryIconNow);
+        }
+
+        private void DrawBatteryIconNow()
+        {
+            _drawBatteryIcon(taskbarIcon, (LogiDevice)DataContext);
         }
 
         private void DrawNumericIcon(TaskbarIcon taskbarIcon, LogiDevice device)

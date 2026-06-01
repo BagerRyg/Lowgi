@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Microsoft.Win32;
 
@@ -21,6 +22,7 @@ public static class CrashLog
             ConfigureNativeCrashDumps(executableName);
             StartHeartbeat();
             WriteRunEvent("logging enabled");
+            WriteSystemInfo();
         }
         else
         {
@@ -142,6 +144,39 @@ public static class CrashLog
         catch
         {
         }
+    }
+
+    public static void WriteDebugInfo(string category, params string[] values)
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        try
+        {
+            string line = string.Join('\t', new[] { DateTimeOffset.Now.ToString("O"), category }.Concat(values));
+            File.AppendAllText(Path.Combine(LogDirectory, "debug_info.log"), line + Environment.NewLine);
+        }
+        catch
+        {
+        }
+    }
+
+    private static void WriteSystemInfo()
+    {
+        WriteDebugInfo(
+            "SYSTEM",
+            $"appBase={AppContext.BaseDirectory}",
+            $"os={Environment.OSVersion}",
+            $"runtime={Environment.Version}",
+            $"processId={Environment.ProcessId}",
+            $"machine={Environment.MachineName}",
+            $"user={Environment.UserName}",
+            $"processorCount={Environment.ProcessorCount}",
+            $"is64BitOS={Environment.Is64BitOperatingSystem}",
+            $"is64BitProcess={Environment.Is64BitProcess}",
+            $"workingSet={Environment.WorkingSet}");
     }
 
     private static void WriteHeartbeat()

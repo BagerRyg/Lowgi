@@ -136,6 +136,12 @@ namespace LowgiUI
             OnPropertyChanged(nameof(BatteryPollingInterval10));
         }
 
+        public bool LedModeDynamic
+        {
+            get => _userSettings.LedMode == LogiLedMode.Dynamic;
+            set => SetLedMode(value, LogiLedMode.Dynamic);
+        }
+
         public bool LedModeWhite
         {
             get => _userSettings.LedMode == LogiLedMode.White;
@@ -168,6 +174,7 @@ namespace LowgiUI
             }
 
             _userSettings.LedMode = mode;
+            OnPropertyChanged(nameof(LedModeDynamic));
             OnPropertyChanged(nameof(LedModeWhite));
             OnPropertyChanged(nameof(LedModeGrey));
             OnPropertyChanged(nameof(LedModeLowBattery));
@@ -207,6 +214,19 @@ namespace LowgiUI
             }
         }
 
+        public bool LightTheme
+        {
+            get => _userSettings.LightTheme;
+            set
+            {
+                _userSettings.LightTheme = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(DarkTheme));
+            }
+        }
+
+        public bool DarkTheme => !LightTheme;
+
         private const string AutoStartRegKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private const string AutoStartRegKeyValue = "LowgiGUI";
         private bool? _autoStart = null;
@@ -242,7 +262,13 @@ namespace LowgiUI
 
                     if (value)
                     {
-                        registryKey.SetValue(AutoStartRegKeyValue, Environment.ProcessPath!);
+                        string? autoStartCommand = GetAutoStartCommand();
+                        if (autoStartCommand == null)
+                        {
+                            return;
+                        }
+
+                        registryKey.SetValue(AutoStartRegKeyValue, autoStartCommand, RegistryValueKind.String);
                     }
                     else
                     {
@@ -258,6 +284,40 @@ namespace LowgiUI
             }
         }
 
+        private static string? GetAutoStartCommand()
+        {
+            return Environment.ProcessPath == null
+                ? null
+                : $"\"{Environment.ProcessPath}\"";
+        }
+
+        private void NormalizeAutoStartCommand()
+        {
+            if (!AutoStart)
+            {
+                return;
+            }
+
+            string? autoStartCommand = GetAutoStartCommand();
+            if (autoStartCommand == null)
+            {
+                return;
+            }
+
+            try
+            {
+                using RegistryKey? registryKey = Registry.CurrentUser.OpenSubKey(AutoStartRegKey, true);
+                if (!string.Equals(registryKey?.GetValue(AutoStartRegKeyValue) as string, autoStartCommand, StringComparison.OrdinalIgnoreCase))
+                {
+                    registryKey?.SetValue(AutoStartRegKeyValue, autoStartCommand, RegistryValueKind.String);
+                }
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException)
+            {
+                _autoStart = false;
+            }
+        }
+
         [ObservableProperty]
         private bool _rediscoverDevicesEnabled = true;
 
@@ -266,6 +326,7 @@ namespace LowgiUI
 
         private bool _quitConfirmationRequired;
         private int _quitConfirmationVersion;
+        private AboutWindow? _aboutWindow;
 
         private readonly IEnumerable<IDeviceManager> _deviceManagers;
 
@@ -285,6 +346,8 @@ namespace LowgiUI
 
             _logiDevices.CollectionChanged += LogiDevicesCollectionChanged;
             SyncDeviceMenuEntries();
+            NormalizeAutoStartCommand();
+            TrayThemeManager.Apply(_userSettings.LightTheme);
         }
 
         private void LogiDevicesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -385,7 +448,6 @@ namespace LowgiUI
         [RelayCommand]
         private async Task RediscoverDevices()
         {
-            Console.WriteLine("Rediscover");
             RediscoverDevicesEnabled = false;
 
             foreach (var manager in _deviceManagers)
@@ -396,6 +458,35 @@ namespace LowgiUI
             await Task.Delay(10_000);
 
             RediscoverDevicesEnabled = true;
+        }
+
+        [RelayCommand]
+        private void ShowAbout()
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (_aboutWindow == null || !_aboutWindow.IsVisible)
+                {
+                    _aboutWindow = new AboutWindow();
+                    _aboutWindow.Closed += (_, _) => _aboutWindow = null;
+                    _aboutWindow.Show();
+                    return;
+                }
+
+                _aboutWindow.Activate();
+            });
+        }
+
+        [RelayCommand]
+        private void SetDarkTheme()
+        {
+            LightTheme = false;
+        }
+
+        [RelayCommand]
+        private void SetLightTheme()
+        {
+            LightTheme = true;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)

@@ -1,8 +1,5 @@
 using Microsoft.Win32;
 using System.ComponentModel;
-using System.Globalization;
-using System.Management;
-using System.Security.Principal;
 
 namespace LowgiUI
 {
@@ -24,44 +21,23 @@ namespace LowgiUI
 
         public static event PropertyChangedEventHandler? StaticPropertyChanged;
 
-        static CheckTheme()
+        public static void SetLightTheme(bool lightTheme)
         {
-            var currentUser = WindowsIdentity.GetCurrent();
-            string query = string.Format(
-                CultureInfo.InvariantCulture,
-                @"SELECT * FROM RegistryValueChangeEvent WHERE Hive = 'HKEY_USERS' AND KeyPath = '{0}\\{1}' AND ValueName = '{2}'",
-                currentUser.User!.Value,
-                RegistryKeyPath.Replace(@"\", @"\\"),
-                RegistryValueName);
-
-            try
-            {
-                var watcher = new ManagementEventWatcher(query);
-                watcher.EventArrived += Watcher_EventArrived;
-
-                watcher.Start();
-                UpdateThemeStatus();
-            }
-            catch
-            {
-                // Fails on Win7
-                _lightTheme = false;
-            }
-
-        }
-
-        private static void UpdateThemeStatus()
-        {
-            var regPath = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
-            int regFlag = (int)regPath!.GetValue(RegistryValueName, 0);
-
-            _lightTheme = regFlag != 0;
+            _lightTheme = lightTheme;
             StaticPropertyChanged?.Invoke(typeof(CheckTheme), new(nameof(LightTheme)));
         }
 
-        private static void Watcher_EventArrived(object sender, EventArrivedEventArgs e)
+        public static bool GetSystemLightTheme()
         {
-            UpdateThemeStatus();
+            try
+            {
+                using var regPath = Registry.CurrentUser.OpenSubKey(RegistryKeyPath, false);
+                return regPath?.GetValue(RegistryValueName, 0) is int regFlag && regFlag != 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

@@ -9,6 +9,11 @@ namespace LowgiUI
 {
     public partial class UserSettingsWrapper : ObservableObject
     {
+        public UserSettingsWrapper()
+        {
+            Properties.Settings.Default.LightTheme = CheckTheme.GetSystemLightTheme();
+        }
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "")]
         public StringCollection SelectedDevices => Properties.Settings.Default.SelectedDevices;
         public StringCollection CachedBatteryPercentages => Properties.Settings.Default.CachedBatteryPercentages;
@@ -55,7 +60,7 @@ namespace LowgiUI
             {
                 return Enum.TryParse(Properties.Settings.Default.LedMode, true, out LogiLedMode ledMode)
                     ? ledMode
-                    : LogiLedMode.LowBattery;
+                    : LogiLedMode.Dynamic;
             }
             set
             {
@@ -87,6 +92,19 @@ namespace LowgiUI
                 Properties.Settings.Default.BatteryPollingIntervalMinutes = value;
                 SaveSettings();
                 RuntimeSettings.SetBatteryPollingIntervalMinutes(value);
+
+                OnPropertyChanged();
+            }
+        }
+
+        public bool LightTheme
+        {
+            get => Properties.Settings.Default.LightTheme;
+            set
+            {
+                Properties.Settings.Default.LightTheme = value;
+                SaveSettings();
+                TrayThemeManager.Apply(value);
 
                 OnPropertyChanged();
             }

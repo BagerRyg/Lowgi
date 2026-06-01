@@ -88,7 +88,7 @@ namespace LowgiUI.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("LowBattery")]
+        [global::System.Configuration.DefaultSettingValueAttribute("Dynamic")]
         public string LedMode {
             get {
                 return ((string)(this["LedMode"]));
@@ -119,6 +119,18 @@ namespace LowgiUI.Properties {
             }
             set {
                 this["BatteryPollingIntervalMinutes"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LightTheme {
+            get {
+                return ((bool)(this["LightTheme"]));
+            }
+            set {
+                this["LightTheme"] = value;
             }
         }
     }
