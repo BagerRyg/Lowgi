@@ -256,7 +256,7 @@ namespace LowgiHID
             if (ret == null) { return; }
 
             var batStatus = ret.Value;
-            if (!IsPlausibleBatteryUpdate(batStatus))
+            if (!IsValidBatteryUpdate(batStatus))
             {
                 return;
             }
@@ -277,31 +277,9 @@ namespace LowgiHID
             );
         }
 
-        private bool IsPlausibleBatteryUpdate(BatteryUpdateReturn batStatus)
+        private static bool IsValidBatteryUpdate(BatteryUpdateReturn batStatus)
         {
-            if (batStatus.batteryPercentage is < 0 or > 100)
-            {
-                return false;
-            }
-
-            if (!hasBatteryReturn)
-            {
-                return true;
-            }
-
-            bool wasCharging = lastBatteryReturn.status
-                is PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
-                or PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL;
-            bool isCharging = batStatus.status
-                is PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
-                or PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL;
-
-            if (!wasCharging && !isCharging && batStatus.batteryPercentage > lastBatteryReturn.batteryPercentage + 5)
-            {
-                return false;
-            }
-
-            return true;
+            return batStatus.batteryPercentage is >= 0 and <= 100;
         }
 
         private async Task InitLedAsync()
