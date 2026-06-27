@@ -16,7 +16,10 @@ public static partial class TraySubmenuController
     private const double BoundsInflate = 6;
     private const double HoverEdgeDeadZone = 5;
     private const int OpenDelayMs = 120;
+    private const int AimDelayMs = 300;
     private const int CloseDelayMs = 300;
+    private const int PointerHistoryMs = 350;
+    private const int MaxPointerHistory = 6;
 
     private static readonly DependencyProperty ControllerProperty = DependencyProperty.RegisterAttached(
         "Controller",
@@ -126,6 +129,7 @@ public static partial class TraySubmenuController
         private readonly DispatcherTimer _openTimer;
         private readonly DispatcherTimer _closeTimer;
         private readonly List<MenuItem> _openItems = [];
+        private readonly List<PointerSample> _pointerHistory = [];
 
         private MenuItem? _pendingItem;
         private MenuItem? _activeItem;
@@ -135,6 +139,8 @@ public static partial class TraySubmenuController
         private bool _activeOpensLeft;
         private bool? _submenusOpenLeft;
         private bool _isClosingSubmenus;
+
+        private readonly record struct PointerSample(Point Position, DateTimeOffset Timestamp);
 
         public Controller(ContextMenu menu)
         {
@@ -182,11 +188,14 @@ public static partial class TraySubmenuController
             _activeItem = null;
             _activePopup = null;
             _submenusOpenLeft = null;
+            _pointerHistory.Clear();
             _openItems.Clear();
         }
 
         private void MenuItemMouseEnter(object sender, MouseEventArgs e)
         {
+            TrackPointer(e);
+
             if (FindParentMenuItem(e.OriginalSource as DependencyObject) is not { IsEnabled: true } menuItem)
             {
                 return;
@@ -204,9 +213,7 @@ public static partial class TraySubmenuController
             }
 
             ConfigureMenuItem(menuItem);
-            _pendingItem = menuItem;
-            _openTimer.Stop();
-            _openTimer.Start();
+            QueueSubmenuOpen(menuItem, GetOpenDelay(menuItem));
             _closeTimer.Stop();
         }
 
@@ -225,6 +232,18 @@ public static partial class TraySubmenuController
         {
             if (e.OriginalSource is not MenuItem menuItem)
             {
+                return;
+            }
+
+            if (menuItem != _activeItem && IsPointerAimingAtActiveSubmenu(menuItem))
+            {
+                QueueSubmenuOpen(menuItem, TimeSpan.FromMilliseconds(AimDelayMs));
+                menuItem.IsSubmenuOpen = false;
+                if (_activeItem is { HasItems: true, IsEnabled: true })
+                {
+                    _activeItem.IsSubmenuOpen = true;
+                }
+
                 return;
             }
 
@@ -264,6 +283,8 @@ public static partial class TraySubmenuController
 
         private void MenuMouseMove(object sender, MouseEventArgs e)
         {
+            TrackPointer(e);
+
             if (FindParentMenuItem(e.OriginalSource as DependencyObject) is not { IsEnabled: true } menuItem)
             {
                 return;
@@ -276,9 +297,7 @@ public static partial class TraySubmenuController
             else if (menuItem != _activeItem && !IsNearMenuItemEdge(menuItem, e))
             {
                 ConfigureMenuItem(menuItem);
-                _pendingItem = menuItem;
-                _openTimer.Stop();
-                _openTimer.Start();
+                QueueSubmenuOpen(menuItem, GetOpenDelay(menuItem));
             }
 
             if (IsCursorInsideMenuSystem())
@@ -319,6 +338,21 @@ public static partial class TraySubmenuController
             _activeItem = menuItem;
             menuItem.IsSubmenuOpen = true;
             _menu.Dispatcher.BeginInvoke(UpdateActiveBounds, DispatcherPriority.Loaded);
+        }
+
+        private void QueueSubmenuOpen(MenuItem menuItem, TimeSpan delay)
+        {
+            _pendingItem = menuItem;
+            _openTimer.Stop();
+            _openTimer.Interval = delay;
+            _openTimer.Start();
+        }
+
+        private TimeSpan GetOpenDelay(MenuItem menuItem)
+        {
+            return IsPointerAimingAtActiveSubmenu(menuItem)
+                ? TimeSpan.FromMilliseconds(AimDelayMs)
+                : TimeSpan.FromMilliseconds(OpenDelayMs);
         }
 
         private void CloseTimerTick(object? sender, EventArgs e)
@@ -482,7 +516,7 @@ public static partial class TraySubmenuController
                 return true;
             }
 
-            return IsInsideSafeCorridor(cursor);
+            return IsInsideSafeCorridor(cursor) || IsInsideSafeTriangle(cursor);
         }
 
         private bool IsInsideSafeCorridor(Point cursor)
@@ -507,6 +541,134 @@ public static partial class TraySubmenuController
             corridor.Inflate(BoundsInflate, BoundsInflate);
 
             return corridor.Contains(cursor);
+        }
+
+        private bool IsInsideSafeTriangle(Point cursor)
+        {
+            if (_activeItem is null || _activePopupBounds.IsEmpty || _pointerHistory.Count < 2)
+            {
+                return false;
+            }
+
+            return IsInsideSafeTriangle(cursor, _activePopupBounds, GetOpensLeft(_activeItemBounds, _activePopupBounds));
+        }
+
+        private bool IsPointerAimingAtActiveSubmenu(MenuItem candidateItem)
+        {
+            if (_activeItem is null
+                || candidateItem == _activeItem
+                || _activePopupBounds.IsEmpty
+                || ItemsControl.ItemsControlFromItemContainer(candidateItem) != ItemsControl.ItemsControlFromItemContainer(_activeItem)
+                || _pointerHistory.Count < 2)
+            {
+                return false;
+            }
+
+            UpdateActiveBounds();
+            if (_activePopupBounds.IsEmpty)
+            {
+                return false;
+            }
+
+            Point current = _pointerHistory[^1].Position;
+            Point anchor = GetAimAnchorPoint(candidateItem);
+            (Point edgeA, Point edgeB) = GetSubmenuAimEdge(_activePopupBounds, GetOpensLeft(_activeItemBounds, _activePopupBounds));
+
+            // Safe-triangle/menu-aim logic: while the pointer is travelling from the
+            // current menu toward the exposed edge of the already-open submenu, do not
+            // immediately switch to a neighbouring item that the pointer crosses over.
+            // Once the pointer exits this virtual triangle, normal hover timing resumes.
+            return IsPointInTriangle(current, anchor, edgeA, edgeB);
+        }
+
+        private bool IsInsideSafeTriangle(Point cursor, Rect popupBounds, bool opensLeft)
+        {
+            if (popupBounds.IsEmpty || _pointerHistory.Count < 2)
+            {
+                return false;
+            }
+
+            Point anchor = GetOldestRecentPointer();
+            (Point edgeA, Point edgeB) = GetSubmenuAimEdge(popupBounds, opensLeft);
+            return IsPointInTriangle(cursor, anchor, edgeA, edgeB);
+        }
+
+        private Point GetOldestRecentPointer()
+        {
+            DateTimeOffset cutoff = DateTimeOffset.Now.AddMilliseconds(-PointerHistoryMs);
+            foreach (PointerSample sample in _pointerHistory)
+            {
+                if (sample.Timestamp >= cutoff)
+                {
+                    return sample.Position;
+                }
+            }
+
+            return _pointerHistory[0].Position;
+        }
+
+        private Point GetAimAnchorPoint(MenuItem candidateItem)
+        {
+            DateTimeOffset cutoff = DateTimeOffset.Now.AddMilliseconds(-PointerHistoryMs);
+            Rect candidateBounds = GetElementBounds(candidateItem);
+            Point anchor = _pointerHistory[0].Position;
+
+            for (int i = 0; i < _pointerHistory.Count; i++)
+            {
+                PointerSample sample = _pointerHistory[i];
+                if (sample.Timestamp < cutoff)
+                {
+                    continue;
+                }
+
+                if (candidateBounds.Contains(sample.Position))
+                {
+                    return anchor;
+                }
+
+                anchor = sample.Position;
+            }
+
+            return anchor;
+        }
+
+        private static (Point A, Point B) GetSubmenuAimEdge(Rect popupBounds, bool opensLeft)
+        {
+            return opensLeft
+                ? (new Point(popupBounds.Right, popupBounds.Top), new Point(popupBounds.Right, popupBounds.Bottom))
+                : (new Point(popupBounds.Left, popupBounds.Top), new Point(popupBounds.Left, popupBounds.Bottom));
+        }
+
+        private static bool IsPointInTriangle(Point point, Point a, Point b, Point c)
+        {
+            static double Area(Point p1, Point p2, Point p3)
+            {
+                return Math.Abs(
+                    (p1.X * (p2.Y - p3.Y)
+                     + p2.X * (p3.Y - p1.Y)
+                     + p3.X * (p1.Y - p2.Y)) / 2);
+            }
+
+            double total = Area(a, b, c);
+            double a1 = Area(point, b, c);
+            double a2 = Area(a, point, c);
+            double a3 = Area(a, b, point);
+
+            return Math.Abs(total - (a1 + a2 + a3)) < 0.5;
+        }
+
+        private void TrackPointer(MouseEventArgs e)
+        {
+            Point position = ToDip(_menu, _menu.PointToScreen(e.GetPosition(_menu)));
+            DateTimeOffset now = DateTimeOffset.Now;
+            _pointerHistory.Add(new PointerSample(position, now));
+
+            DateTimeOffset cutoff = now.AddMilliseconds(-PointerHistoryMs);
+            _pointerHistory.RemoveAll(sample => sample.Timestamp < cutoff);
+            if (_pointerHistory.Count > MaxPointerHistory)
+            {
+                _pointerHistory.RemoveRange(0, _pointerHistory.Count - MaxPointerHistory);
+            }
         }
 
         private bool ShouldKeepSubmenuOpen(MenuItem menuItem)
@@ -537,7 +699,9 @@ public static partial class TraySubmenuController
                     return true;
                 }
 
-                return IsInsideSafeCorridor(cursor, itemBounds, popupBounds, GetOpensLeft(itemBounds, popupBounds));
+                bool opensLeft = GetOpensLeft(itemBounds, popupBounds);
+                return IsInsideSafeCorridor(cursor, itemBounds, popupBounds, opensLeft)
+                    || IsInsideSafeTriangle(cursor, popupBounds, opensLeft);
             }
 
             return false;

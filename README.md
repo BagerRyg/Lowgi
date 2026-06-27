@@ -68,7 +68,7 @@ That means the startup entry is per-user and does not require administrator righ
 
 Lowgi supports several LED modes for devices that expose compatible Logitech LED controls:
 
-* **Dynamic**: The default mode. Green at 100% battery while plugged in, orange while plugged in and charging below 100%, red at 50% brightness below the selected warning threshold, and dim white while idle.
+* **Dynamic**: The default mode. Green at 100% battery, red at 50% brightness below the selected warning threshold, and dim white otherwise.
 * **Bright White**: Keeps the LED white at full brightness.
 * **Dim White**: Keeps the LED white at reduced brightness.
 * **Low Battery**: Keeps the LED dim white normally, then changes it to red when the battery is at or below the selected warning threshold.

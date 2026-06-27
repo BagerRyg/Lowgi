@@ -430,8 +430,18 @@ namespace LowgiHID
                 500);
         }
 
-        public async Task ApplyLedMode(LogiLedMode ledMode, int lowBatteryThreshold, bool isSelected)
+        public async Task ApplyLedMode(LogiLedMode ledMode, int lowBatteryThreshold, bool isSelected, bool refreshBattery = true, bool refreshLed = false)
         {
+            if (Parent.Disposed)
+            {
+                return;
+            }
+
+            if (isSelected && (refreshLed || _ledFeatureIndex == null || _ledFeatureId == null || _ledZones.Count == 0))
+            {
+                await InitLedAsync();
+            }
+
             if (!isSelected || _ledFeatureIndex == null || _ledFeatureId == null || _ledZones.Count == 0)
             {
                 string ledFeatureIndex = _ledFeatureIndex is { } value ? value.ToString("X2") : "none";
@@ -443,6 +453,11 @@ namespace LowgiHID
             byte red = 0;
             byte green = 0;
             byte blue = 0;
+
+            if (refreshBattery && ledMode is (LogiLedMode.Dynamic or LogiLedMode.LowBattery))
+            {
+                await UpdateBattery();
+            }
 
             switch (ledMode)
             {
@@ -456,7 +471,10 @@ namespace LowgiHID
                     red = green = blue = 128;
                     break;
                 case LogiLedMode.LowBattery:
-                    if (hasBatteryReturn && lastBatteryReturn.batteryPercentage <= lowBatteryThreshold)
+                    if (HasFreshBatteryReturn()
+                        && lastBatteryReturn.batteryPercentage <= lowBatteryThreshold
+                        && lastBatteryReturn.status != PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
+                        && lastBatteryReturn.status != PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL)
                     {
                         red = 255;
                     }
@@ -467,37 +485,59 @@ namespace LowgiHID
                     break;
             }
 
+            LogLed($"LED apply mode={ledMode} refreshBattery={refreshBattery} battery={(hasBatteryReturn ? lastBatteryReturn.batteryPercentage.ToString("0") : "none")} threshold={lowBatteryThreshold} status={(hasBatteryReturn ? lastBatteryReturn.status : PowerSupplyStatus.POWER_SUPPLY_STATUS_UNKNOWN)} lastUpdate={lastUpdate:O} rgb={red},{green},{blue}");
+
             if (_ledFeatureId == 0x8071)
             {
                 await ClaimRgbControl();
             }
 
+            bool setFailed = false;
             foreach (var zone in _ledZones)
             {
-                await SetLedZoneState(zone, enabled, red, green, blue);
+                if (!await SetLedZoneState(zone, enabled, red, green, blue))
+                {
+                    setFailed = true;
+                }
+            }
+
+            if (setFailed)
+            {
+                LogLed("LED set failed; refreshing LED feature data and retrying once");
+                await InitLedAsync();
+
+                if (_ledFeatureIndex == null || _ledFeatureId == null || _ledZones.Count == 0)
+                {
+                    LogLed("LED retry skipped; no LED feature after refresh");
+                    return;
+                }
+
+                if (_ledFeatureId == 0x8071)
+                {
+                    await ClaimRgbControl();
+                }
+
+                foreach (var zone in _ledZones)
+                {
+                    await SetLedZoneState(zone, enabled, red, green, blue);
+                }
             }
         }
 
         private (byte Red, byte Green, byte Blue) GetDynamicLedColor(int lowBatteryThreshold)
         {
-            if (!hasBatteryReturn)
+            if (!HasFreshBatteryReturn())
             {
                 return (128, 128, 128);
             }
 
-            bool pluggedIn = lastBatteryReturn.status
-                is PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
-                or PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL
-                or PowerSupplyStatus.POWER_SUPPLY_STATUS_NOT_CHARGING;
-
-            if (pluggedIn && lastBatteryReturn.batteryPercentage >= 100)
+            if (lastBatteryReturn.status == PowerSupplyStatus.POWER_SUPPLY_STATUS_FULL
+                || (lastBatteryReturn.status == PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING
+                    && lastBatteryReturn.batteryPercentage >= 100)
+                || (lastBatteryReturn.status == PowerSupplyStatus.POWER_SUPPLY_STATUS_NOT_CHARGING
+                    && lastBatteryReturn.batteryPercentage >= 100))
             {
                 return (0, 255, 0);
-            }
-
-            if (pluggedIn)
-            {
-                return (255, 128, 0);
             }
 
             if (lastBatteryReturn.batteryPercentage <= lowBatteryThreshold)
@@ -506,6 +546,13 @@ namespace LowgiHID
             }
 
             return (128, 128, 128);
+        }
+
+        private bool HasFreshBatteryReturn()
+        {
+            int freshnessSeconds = Math.Max(30, GlobalSettings.settings.PollPeriod * 2);
+            return hasBatteryReturn
+                && DateTimeOffset.Now <= lastUpdate.AddSeconds(freshnessSeconds);
         }
 
         private async Task ClaimRgbControl()
@@ -529,11 +576,11 @@ namespace LowgiHID
             }
         }
 
-        private async Task SetLedZoneState(LedZone zone, bool enabled, byte red, byte green, byte blue)
+        private async Task<bool> SetLedZoneState(LedZone zone, bool enabled, byte red, byte green, byte blue)
         {
             if (_ledFeatureIndex == null || _ledFeatureId == null)
             {
-                return;
+                return false;
             }
 
             try
@@ -548,7 +595,7 @@ namespace LowgiHID
                 if (effectIndex == null)
                 {
                     LogLed($"LED set skipped zone={zone.Index} missing static/disabled effect");
-                    return;
+                    return false;
                 }
 
                 byte[] buffer = new byte[20];
@@ -572,10 +619,12 @@ namespace LowgiHID
 
                 var ret = await _parent.WriteRead20(_parent.DevLong, buffer, 500);
                 LogLed($"LED set zone={zone.Index} effect=0x{(enabled ? 1 : 0):X4}/{effectIndex.Value} enabled={enabled} rgb={red},{green},{blue} result={FormatResult(ret)} raw={ToHex(ret)}");
+                return IsSuccessfulResult(ret);
             }
             catch (Exception ex)
             {
                 LogLed($"LED set failed zone={zone.Index}: {ex.GetType().Name}");
+                return false;
             }
         }
 
@@ -599,6 +648,11 @@ namespace LowgiHID
                 : ret.GetFeatureIndex() == 0xFF
                     ? $"error=0x{ret.GetParam(2):X2}"
                     : $"ok feature=0x{ret.GetFeatureIndex():X2}";
+        }
+
+        private static bool IsSuccessfulResult(Hidpp20 ret)
+        {
+            return ret.Length != 0 && ret.GetFeatureIndex() != 0xFF;
         }
 
         private static string ToHex(Hidpp20 ret)

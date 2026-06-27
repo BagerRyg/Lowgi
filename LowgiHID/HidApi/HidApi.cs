@@ -68,6 +68,15 @@ namespace LowgiHID.HidApi
             return _HidOpenPath(dev.Path);
         }
 
+        internal static unsafe nint HidOpenPath(string path)
+        {
+            byte[] pathBytes = System.Text.Encoding.UTF8.GetBytes(path + '\0');
+            fixed (byte* pathPtr = pathBytes)
+            {
+                return _HidOpenPath(pathPtr);
+            }
+        }
+
         [LibraryImport("hidapi", EntryPoint = "hid_close")]
         internal static unsafe partial void HidClose(nint dev);
 

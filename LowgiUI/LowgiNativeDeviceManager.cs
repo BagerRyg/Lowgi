@@ -14,6 +14,8 @@ namespace LowgiUI;
 
 public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
 {
+    private static readonly TimeSpan LedModeReapplyInterval = TimeSpan.FromSeconds(15);
+
     private readonly IPublisher<IPCMessage> _deviceEventBus;
     private readonly AppSettings _appSettings;
     private readonly UserSettingsWrapper _userSettings;
@@ -38,6 +40,7 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
             HidppManagerContext.Instance.Start(_cts.Token);
             _userSettings.PropertyChanged += UserSettingsPropertyChanged;
             _started = true;
+            _ = ReapplyLedModeLoop(_cts.Token);
         }
         catch (Exception ex) when (ex is DllNotFoundException or TypeInitializationException)
         {
@@ -65,6 +68,7 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
         if (_started)
         {
             await HidppManagerContext.Instance.ForceBatteryUpdates();
+            await ApplyLedModeAsync(refreshBattery: false, refreshLed: true);
         }
     }
 
@@ -78,17 +82,20 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
         }
         else if (message is UpdateMessage)
         {
-            ApplyLedMode();
+            _ = ApplyLedModeAsync(refreshBattery: false);
         }
     }
 
     private void UserSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(UserSettingsWrapper.LedMode)
-            or nameof(UserSettingsWrapper.LowBatteryWarningThreshold)
+        if (e.PropertyName is nameof(UserSettingsWrapper.LedMode))
+        {
+            _ = ApplyLedModeAsync(refreshLed: true);
+        }
+        else if (e.PropertyName is nameof(UserSettingsWrapper.LowBatteryWarningThreshold)
             or nameof(UserSettingsWrapper.SelectedDevices))
         {
-            ApplyLedMode();
+            _ = ApplyLedModeAsync();
         }
         else if (e.PropertyName is nameof(UserSettingsWrapper.BatteryPollingIntervalMinutes))
         {
@@ -96,17 +103,19 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
         }
     }
 
-    private void ApplyLedMode()
+    private Task ApplyLedModeAsync(bool refreshBattery = true, bool refreshLed = false)
     {
         if (!_started)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        _ = HidppManagerContext.Instance.ApplyLedMode(
+        return HidppManagerContext.Instance.ApplyLedMode(
             _userSettings.LedMode,
             _userSettings.LowBatteryWarningThreshold,
-            _userSettings.SelectedDevices.Cast<string>().Where(x => !string.IsNullOrEmpty(x)));
+            _userSettings.SelectedDevices.Cast<string>().Where(x => !string.IsNullOrEmpty(x)),
+            refreshBattery,
+            refreshLed);
     }
 
     private async Task RefreshBatteryAndLedMode()
@@ -117,6 +126,26 @@ public class LowgiNativeDeviceManager : IDeviceManager, IHostedService
         }
 
         await HidppManagerContext.Instance.ForceBatteryUpdates();
-        ApplyLedMode();
+        await ApplyLedModeAsync(refreshBattery: false);
+    }
+
+    private async Task ReapplyLedModeLoop(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(LedModeReapplyInterval, cancellationToken);
+                await ApplyLedModeAsync(refreshBattery: false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                CrashLog.Write(ex, "LED reapply loop");
+            }
+        }
     }
 }

@@ -17,7 +17,7 @@ namespace LowgiHID
         private readonly Dictionary<string, Guid> _containerMap = [];
         private readonly Dictionary<Guid, HidppDevices> _deviceMap = [];
         private readonly object _deviceMapLock = new();
-        private readonly BlockingCollection<HidDeviceInfo> _deviceQueue = [];
+        private readonly BlockingCollection<HidDeviceSnapshot> _deviceQueue = [];
         private readonly Delegate _deviceArrivedCallback;
         private readonly Delegate _deviceLeftCallback;
         private HidHotPlugCallbackHandle _deviceArrivedCallbackHandle;
@@ -49,7 +49,7 @@ namespace LowgiHID
             {
                 if (hidApiHotPlugEvent == HidApiHotPlugEvent.HID_API_HOTPLUG_EVENT_DEVICE_ARRIVED)
                 {
-                    _deviceQueue.Add(*device);
+                    _deviceQueue.Add(HidDeviceSnapshot.From(*device));
                 }
             }
             catch (Exception ex)
@@ -60,9 +60,9 @@ namespace LowgiHID
             return 0;
         }
 
-        private async Task<int> InitDevice(HidDeviceInfo deviceInfo)
+        private async Task<int> InitDevice(HidDeviceSnapshot deviceInfo)
         {
-            var messageType = (deviceInfo).GetHidppMessageType();
+            var messageType = deviceInfo.MessageType;
             LogHidDevice("ARRIVE", deviceInfo, messageType);
             switch (messageType)
             {
@@ -71,9 +71,9 @@ namespace LowgiHID
                     return 0;
             }
 
-            string devPath = (deviceInfo).GetPath();
+            string devPath = deviceInfo.Path;
 
-            HidDevicePtr dev = HidOpenPath(ref deviceInfo);
+            HidDevicePtr dev = HidOpenPath(devPath);
             if (dev == IntPtr.Zero)
             {
                 return 0;
@@ -125,7 +125,8 @@ namespace LowgiHID
         {
             try
             {
-                LogHidDevice("LEFT", *deviceInfo, (*deviceInfo).GetHidppMessageType());
+                HidDeviceSnapshot snapshot = HidDeviceSnapshot.From(*deviceInfo);
+                LogHidDevice("LEFT", snapshot, snapshot.MessageType);
                 string devPath = (*deviceInfo).GetPath();
 
                 lock (_deviceMapLock)
@@ -159,7 +160,7 @@ namespace LowgiHID
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    HidDeviceInfo dev;
+                    HidDeviceSnapshot dev;
                     try
                     {
                         dev = _deviceQueue.Take(cancellationToken);
@@ -208,6 +209,37 @@ namespace LowgiHID
                 CrashLog.WriteRunEvent($"hid hotplug callbacks registered arrive={_deviceArrivedCallbackHandle} left={_deviceLeftCallbackHandle}");
             }
         }
+
+        public unsafe void RediscoverDevices()
+        {
+            lock (_deviceMapLock)
+            {
+                foreach (var device in _deviceMap.Values)
+                {
+                    device.Dispose();
+                }
+
+                _deviceMap.Clear();
+                _containerMap.Clear();
+            }
+
+            HidDeviceInfo* devices = HidEnumerate(0x046D, 0x00);
+            try
+            {
+                for (HidDeviceInfo* device = devices; device != null; device = device->Next)
+                {
+                    HidppMessageType messageType = (*device).GetHidppMessageType();
+                    if (messageType is HidppMessageType.SHORT or HidppMessageType.LONG)
+                    {
+                        _deviceQueue.Add(HidDeviceSnapshot.From(*device, messageType));
+                    }
+                }
+            }
+            finally
+            {
+                HidFreeEnumeration(devices);
+            }
+        }
     
         public async Task ForceBatteryUpdates()
         {
@@ -227,7 +259,7 @@ namespace LowgiHID
             }
         }
 
-        private static void LogHidDevice(string action, HidDeviceInfo deviceInfo, HidppMessageType messageType)
+        private static void LogHidDevice(string action, HidDeviceSnapshot deviceInfo, HidppMessageType messageType)
         {
             if (!CrashLog.Enabled)
             {
@@ -255,7 +287,36 @@ namespace LowgiHID
             }
         }
 
-        public async Task ApplyLedMode(LogiLedMode ledMode, int lowBatteryThreshold, IEnumerable<string> selectedDeviceIds)
+        private readonly record struct HidDeviceSnapshot(
+            string Path,
+            ushort VendorId,
+            ushort ProductId,
+            ushort UsagePage,
+            ushort Usage,
+            int InterfaceNumber,
+            HidBusType BusType,
+            HidppMessageType MessageType)
+        {
+            public static HidDeviceSnapshot From(HidDeviceInfo deviceInfo)
+            {
+                return From(deviceInfo, deviceInfo.GetHidppMessageType());
+            }
+
+            public static HidDeviceSnapshot From(HidDeviceInfo deviceInfo, HidppMessageType messageType)
+            {
+                return new HidDeviceSnapshot(
+                    deviceInfo.GetPath(),
+                    deviceInfo.VendorId,
+                    deviceInfo.ProductId,
+                    deviceInfo.UsagePage,
+                    deviceInfo.Usage,
+                    deviceInfo.InterfaceNumber,
+                    deviceInfo.BusType,
+                    messageType);
+            }
+        }
+
+        public async Task ApplyLedMode(LogiLedMode ledMode, int lowBatteryThreshold, IEnumerable<string> selectedDeviceIds, bool refreshBattery = true, bool refreshLed = false)
         {
             var selectedDevices = selectedDeviceIds.ToHashSet(StringComparer.Ordinal);
             HidppDevices[] devices;
@@ -273,7 +334,9 @@ namespace LowgiHID
                     .Select(x => x.ApplyLedMode(
                         ledMode,
                         lowBatteryThreshold,
-                        !hasSelectedMatch || selectedDevices.Contains(x.Identifier)));
+                        !hasSelectedMatch || selectedDevices.Contains(x.Identifier),
+                        refreshBattery,
+                        refreshLed));
 
                 await Task.WhenAll(tasks);
             }
