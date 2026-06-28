@@ -38,6 +38,12 @@ namespace LowgiHID
         private BatteryUpdateReturn lastBatteryReturn;
         private bool hasBatteryReturn;
         private DateTimeOffset lastUpdate = DateTimeOffset.MinValue;
+        private bool _initialized;
+        private bool _batteryLoopStarted;
+        private const int LedApplyRetryCount = 4;
+        private const int LedApplyRetryDelayMs = 300;
+
+        public bool Initialized => _initialized;
 
         private readonly HidppDevices _parent;
         public HidppDevices Parent => _parent;
@@ -56,9 +62,19 @@ namespace LowgiHID
 
         public async Task InitAsync()
         {
+            if (_initialized)
+            {
+                return;
+            }
+
             await _initSemaphore.WaitAsync();
             try
             {
+                if (_initialized)
+                {
+                    return;
+                }
+
                 Hidpp20 ret;
 
                 // Sync Ping
@@ -80,6 +96,8 @@ namespace LowgiHID
                 }
 
                 if (successCount < successThresh) { return; }
+
+                _featureMap.Clear();
 
                 // Find 0x0001 IFeatureSet
                 ret = await _parent.WriteRead20(_parent.DevShort, new byte[7] { 0x10, _deviceIdx, 0x00, 0x00 | SW_ID, 0x00, 0x01, 0x00 });
@@ -219,8 +237,16 @@ namespace LowgiHID
                 $"ledFeature={ledFeatureIndex}",
                 $"ledZones={_ledZoneCount}");
 
+            _initialized = true;
+
             await UpdateBattery(true);
 
+            if (_batteryLoopStarted)
+            {
+                return;
+            }
+
+            _batteryLoopStarted = true;
             _ = Task.Run(async () =>
             {
                 if (_getBatteryAsync == null) { return; }
@@ -437,6 +463,25 @@ namespace LowgiHID
                 return;
             }
 
+            if (isSelected && !_initialized)
+            {
+                try
+                {
+                    await InitAsync();
+                }
+                catch (Exception ex)
+                {
+                    LogLed($"LED init failed during apply: {ex.GetType().Name}");
+                    CrashLog.Write(ex, "LED init during apply");
+                }
+            }
+
+            if (isSelected && !_initialized)
+            {
+                LogLed($"LED skip selected={isSelected} initialized={_initialized} mode={ledMode}");
+                return;
+            }
+
             if (isSelected && (refreshLed || _ledFeatureIndex == null || _ledFeatureId == null || _ledZones.Count == 0))
             {
                 await InitLedAsync();
@@ -456,7 +501,15 @@ namespace LowgiHID
 
             if (refreshBattery && ledMode is (LogiLedMode.Dynamic or LogiLedMode.LowBattery))
             {
-                await UpdateBattery();
+                try
+                {
+                    await UpdateBattery();
+                }
+                catch (Exception ex)
+                {
+                    LogLed($"LED battery refresh failed during apply: {ex.GetType().Name}");
+                    CrashLog.Write(ex, "LED battery refresh during apply");
+                }
             }
 
             switch (ledMode)
@@ -487,41 +540,24 @@ namespace LowgiHID
 
             LogLed($"LED apply mode={ledMode} refreshBattery={refreshBattery} battery={(hasBatteryReturn ? lastBatteryReturn.batteryPercentage.ToString("0") : "none")} threshold={lowBatteryThreshold} status={(hasBatteryReturn ? lastBatteryReturn.status : PowerSupplyStatus.POWER_SUPPLY_STATUS_UNKNOWN)} lastUpdate={lastUpdate:O} rgb={red},{green},{blue}");
 
-            if (_ledFeatureId == 0x8071)
+            for (int attempt = 1; attempt <= LedApplyRetryCount; attempt++)
             {
-                await ClaimRgbControl();
-            }
-
-            bool setFailed = false;
-            foreach (var zone in _ledZones)
-            {
-                if (!await SetLedZoneState(zone, enabled, red, green, blue))
+                if (await TryApplyLedState(enabled, red, green, blue))
                 {
-                    setFailed = true;
-                }
-            }
-
-            if (setFailed)
-            {
-                LogLed("LED set failed; refreshing LED feature data and retrying once");
-                await InitLedAsync();
-
-                if (_ledFeatureIndex == null || _ledFeatureId == null || _ledZones.Count == 0)
-                {
-                    LogLed("LED retry skipped; no LED feature after refresh");
                     return;
                 }
 
-                if (_ledFeatureId == 0x8071)
+                LogLed($"LED apply attempt {attempt} failed; refreshing LED feature data");
+                await Task.Delay(LedApplyRetryDelayMs);
+                await InitLedAsync();
+                if (_ledFeatureIndex == null || _ledFeatureId == null || _ledZones.Count == 0)
                 {
-                    await ClaimRgbControl();
-                }
-
-                foreach (var zone in _ledZones)
-                {
-                    await SetLedZoneState(zone, enabled, red, green, blue);
+                    LogLed("LED retry skipped; no LED feature after refresh");
+                    break;
                 }
             }
+
+            LogLed($"LED apply failed after {LedApplyRetryCount} attempts");
         }
 
         private (byte Red, byte Green, byte Blue) GetDynamicLedColor(int lowBatteryThreshold)
@@ -574,6 +610,25 @@ namespace LowgiHID
             {
                 LogLed($"LED rgbControl failed: {ex.GetType().Name}");
             }
+        }
+
+        private async Task<bool> TryApplyLedState(bool enabled, byte red, byte green, byte blue)
+        {
+            if (_ledFeatureId == 0x8071)
+            {
+                await ClaimRgbControl();
+            }
+
+            bool allSucceeded = true;
+            foreach (var zone in _ledZones)
+            {
+                if (!await SetLedZoneState(zone, enabled, red, green, blue))
+                {
+                    allSucceeded = false;
+                }
+            }
+
+            return allSucceeded && _ledZones.Count > 0;
         }
 
         private async Task<bool> SetLedZoneState(LedZone zone, bool enabled, byte red, byte green, byte blue)

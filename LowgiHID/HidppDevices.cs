@@ -21,6 +21,7 @@ namespace LowgiHID
 
         private bool _isReading = true;
         private const int READ_TIMEOUT = 100;
+        private const int InitRetryCount = 8;
 
         private readonly Dictionary<ushort, HidppDevice> _deviceCollection = [];
         public IReadOnlyDictionary<ushort, HidppDevice> DeviceCollection => _deviceCollection;
@@ -125,18 +126,7 @@ namespace LowgiHID
                 if (!_deviceCollection.ContainsKey(deviceIdx))
                 {
                     _deviceCollection[deviceIdx] = new(this, deviceIdx);
-                    new Thread(async () =>
-                    {
-                        try
-                        {
-                            await Task.Delay(1000);
-                            await _deviceCollection[deviceIdx].InitAsync();
-                        }
-                        catch (Exception ex)
-                        {
-                            CrashLog.Write(ex, "HID device init thread");
-                        }
-                    }).Start();
+                    ScheduleDeviceInit(deviceIdx);
                 }
             }
             else
@@ -223,7 +213,8 @@ namespace LowgiHID
                             break;
                         }
 
-                        if (ret.GetFeatureIndex() == 0xFF
+                        if (ret.GetDeviceIdx() == buffer.GetDeviceIdx()
+                            && ret.GetFeatureIndex() == 0xFF
                             && ret.GetFunctionId() == 0x0F
                             && ret.GetParam(0) == buffer.GetFeatureIndex()
                             && ret.GetParam(1) == (buffer[3] & 0xF0))
@@ -231,7 +222,10 @@ namespace LowgiHID
                             return ret;
                         }
 
-                        if ((ret.GetFeatureIndex() == buffer.GetFeatureIndex()) && (ret.GetSoftwareId() == SW_ID))
+                        if (ret.GetDeviceIdx() == buffer.GetDeviceIdx()
+                            && ret.GetFeatureIndex() == buffer.GetFeatureIndex()
+                            && ret.GetFunctionId() == buffer.GetFunctionId()
+                            && ret.GetSoftwareId() == buffer.GetSoftwareId())
                         {
                             return ret;
                         }
@@ -387,9 +381,37 @@ namespace LowgiHID
 
                 foreach ((_, var device) in _deviceCollection)
                 {
-                    await device.InitAsync();
+                    ScheduleDeviceInit(device.DeviceIdx);
                 }
             }
+        }
+
+        private void ScheduleDeviceInit(byte deviceIdx)
+        {
+            _ = Task.Run(async () =>
+            {
+                for (int attempt = 1; attempt <= InitRetryCount; attempt++)
+                {
+                    try
+                    {
+                        if (Disposed || !_deviceCollection.TryGetValue(deviceIdx, out var device))
+                        {
+                            return;
+                        }
+
+                        await Task.Delay(attempt == 1 ? 1000 : 2000);
+                        await device.InitAsync();
+                        if (device.Initialized)
+                        {
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        CrashLog.Write(ex, "HID device init retry");
+                    }
+                }
+            });
         }
     }
 }
